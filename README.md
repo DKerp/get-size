@@ -2,13 +2,13 @@
 
 Determine the size in bytes an object occupies inside RAM.
 
-The [`GetSize`] trait can be used to determine the size of an object inside the stack as well as in the heap. It basically extends the [`size_of`](std::mem::size_of) function provided by the standard library, which can already be used to determine the size of an object in the stack. But many application (e.g. for caching) do also need to know the size occupied inside the heap, for which this library provides an appropriate trait.
+The [`GetSize`] trait can be used to determine the size of an object inside the stack as well as in the heap. It basically extends the [`size_of`](https://doc.rust-lang.org/std/mem/fn.size_of.html) function provided by the standard library, which can already be used to determine the size of an object in the stack. But many application (e.g. for caching) do also need to know the size occupied inside the heap, for which this library provides an appropriate trait.
 
 ## How to implement
 
-The [`GetSize`] trait is already implemented for most objects defined by the standard library, like [`Vec`](std::vec::Vec), [`HashMap`](std::collections::HashMap), [`String`] as well as all the primitive values, like [`u8`], [`i32`] etc.
+The [`GetSize`] trait is already implemented for most objects defined by the standard library, like `Vec`, `HashMap`, `String` as well as all the primitive values, like `u8`, `i32` etc.
 
-Unless you have a complex datastructure which requires a manual implementation, you can easily derive [`GetSize`] for your own structs and enums. The derived implementation will implement [`GetSize::get_heap_size`] by simply calling [`GetSize::get_heap_size`] on all values contained inside the struct or enum variant and return the sum of them.
+Unless you have a complex datastructure which requires a manual implementation, you can easily derive [`GetSize`] for your own structs and enums. The derived implementation will implement [`get_heap_size`] by simply calling [`get_heap_size`] on all values contained inside the struct or enum variant and return the sum of them.
 
 You will need to activate the `derive` feature first, which is disabled by default. Add the following to your `cargo.toml`:
 
@@ -92,3 +92,6 @@ This library is licensed under the [MIT license](http://opensource.org/licenses/
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in this library by you, shall be licensed as MIT, without any additional terms or conditions.
+
+[`GetSize`]: https://docs.rs/get-size/latest/get-size/trait.GetSize.html
+[`get_heap_size`]: https://docs.rs/get-size/latest/get-size/trait.GetSize.html#tymethod.get_heap_size
