@@ -1,5 +1,6 @@
 [package]
 name = "get-size-derive"
+description = "Derives the GetSize trait."
 version = "0.1.0"
 edition = "2021"
 authors = ["Denis Kerp"]

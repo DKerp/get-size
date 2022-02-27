@@ -1,5 +1,9 @@
 # get-size
 
+[![Crates.io](https://img.shields.io/crates/v/get-size)](https://crates.io/crates/get-size)
+[![docs.rs](https://img.shields.io/docsrs/get-size)](https://docs.rs/get-size)
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/DKerp/get-size/blob/main/LICENSE)
+
 Determine the size in bytes an object occupies inside RAM.
 
 The [`GetSize`] trait can be used to determine the size of an object inside the stack as well as in the heap. The [`size_of`](https://doc.rust-lang.org/std/mem/fn.size_of.html) function provided by the standard library can already be used to determine the size of an object in the stack, but many application (e.g. for caching) do also need to know the number of bytes occupied inside the heap, for which this library provides an appropriate trait.

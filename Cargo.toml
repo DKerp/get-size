@@ -1,5 +1,6 @@
 [package]
 name = "get-size"
+description = "Determine the size in bytes an object occupies inside RAM."
 version = "0.1.0"
 edition = "2021"
 authors = ["Denis Kerp"]
