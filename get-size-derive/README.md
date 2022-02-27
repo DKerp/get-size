@@ -38,4 +38,4 @@ This library is licensed under the [MIT license](http://opensource.org/licenses/
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in this library by you, shall be licensed as MIT, without any additional terms or conditions.
 
 [`GetSize`]: https://docs.rs/get-size/latest/get_size/trait.GetSize.html
-[`get_heap_size`]: https://docs.rs/get-size/latest/get_size/trait.GetSize.html#tymethod.get_heap_size
+[`get_heap_size`]: https://docs.rs/get-size/latest/get_size/trait.GetSize.html#method.get_heap_size
