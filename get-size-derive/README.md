@@ -29,9 +29,6 @@ The derive macro will panic if used on unions since these are currently not supp
 
 Note that there will be a compilation error if one of the (not ignored) values encountered does not implement the [`GetSize`] trait.
 
-[`GetSize`]: https://docs.rs/get-size/latest/get-size/trait.GetSize.html
-[`get_heap_size`]: https://docs.rs/get-size/latest/get-size/trait.GetSize.html#tymethod.get_heap_size
-
 ## License
 
 This library is licensed under the [MIT license](http://opensource.org/licenses/MIT).
@@ -39,3 +36,6 @@ This library is licensed under the [MIT license](http://opensource.org/licenses/
 ### Contribution
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in this library by you, shall be licensed as MIT, without any additional terms or conditions.
+
+[`GetSize`]: https://docs.rs/get-size/latest/get_size/trait.GetSize.html
+[`get_heap_size`]: https://docs.rs/get-size/latest/get_size/trait.GetSize.html#tymethod.get_heap_size

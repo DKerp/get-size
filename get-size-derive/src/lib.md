@@ -30,5 +30,5 @@ The derive macro will panic if used on unions since these are currently not supp
 
 Note that there will be a compilation error if one of the (not ignored) values encountered does not implement the [`GetSize`] trait.
 
-[`GetSize`]: https://docs.rs/get-size/latest/get-size/trait.GetSize.html
-[`get_heap_size`]: https://docs.rs/get-size/latest/get-size/trait.GetSize.html#tymethod.get_heap_size
+[`GetSize`]: https://docs.rs/get-size/latest/get_size/trait.GetSize.html
+[`get_heap_size`]: https://docs.rs/get-size/latest/get_size/trait.GetSize.html#tymethod.get_heap_size
