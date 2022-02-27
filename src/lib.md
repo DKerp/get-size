@@ -1,6 +1,6 @@
 Determine the size in bytes an object occupies inside RAM.
 
-The [`GetSize`] trait can be used to determine the size of an object inside the stack as well as in the heap. It basically extends the [`size_of`](std::mem::size_of) function provided by the standard library, which can already be used to determine the size of an object in the stack. But many application (e.g. for caching) do also need to know the size occupied inside the heap, for which this library provides an appropriate trait.
+The [`GetSize`] trait can be used to determine the size of an object inside the stack as well as in the heap. The [`size_of`](std::mem::size_of) function provided by the standard library can already be used to determine the size of an object in the stack, but many application (e.g. for caching) do also need to know the number of bytes occupied inside the heap, for which this library provides an appropriate trait.
 
 # How to implement
 
