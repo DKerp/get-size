@@ -1,0 +1,21 @@
+[package]
+name = "get-size"
+version = "0.1.0"
+edition = "2021"
+authors = ["Denis Kerp"]
+readme = "README.md"
+repository = "https://github.com/DKerp/get-size"
+license = "MIT"
+keywords = ["size", "heap", "ram", "cache", "memory"]
+categories = ["memory-management", "caching"]
+
+[dependencies]
+get-size-derive = { path = "./get-size-derive", optional = true }
+
+[features]
+default = []
+derive = ["get-size-derive"]
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrs"]
