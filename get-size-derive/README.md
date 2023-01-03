@@ -31,7 +31,7 @@ You can also derive [`GetSize`] on structs and enums with generics. In that case
 
 This behavior may be unfavourable if one or more generic types are ignored duo to the corresponding struct field being ignored. In that case you can also use the `ignore` attribute at the struct level to specifiy the generic parameters which shall not be required to implement [`GetSize`] themselves.
 
-# Example
+## Example
 
 ```rust
 use get_size::GetSize;

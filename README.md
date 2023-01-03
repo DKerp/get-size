@@ -83,6 +83,8 @@ get-size = { version = "^0.1", features = ["derive"] }
 
 Then you can easily derive [`GetSize`]. If you want the derive macro to ignore a certain struct field you can add the `ignore` attribute to it. This might be usefull if some values do not implement the [`GetSize`] trait and do not have data on the heap, or if the data on the heap has already been accounted for somewhere else.
 
+### Example
+
 ```rust
 use get_size::GetSize;
 
@@ -110,7 +112,9 @@ fn main() {
 }
 ```
 
-As already mentioned you can also derive [`GetSize`] for enums:
+As already mentioned you can also derive [`GetSize`] for enums.
+
+### Example
 
 ```rust
 use get_size::GetSize;
@@ -152,7 +156,7 @@ You can also derive [`GetSize`] on structs and enums with generics. In that case
 
 This behavior may be unfavourable if one or more generic types are ignored duo to the corresponding struct field being ignored. In that case you can also use the `ignore` attribute at the struct level to specifiy the generic parameters which shall not be required to implement [`GetSize`] themselves.
 
-# Example
+### Example
 
 ```rust
 use get_size::GetSize;
