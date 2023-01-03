@@ -1,5 +1,9 @@
 # get-size-derive
 
+[![Crates.io](https://img.shields.io/crates/v/get-size-derive)](https://crates.io/crates/get-size-derive)
+[![docs.rs](https://img.shields.io/docsrs/get-size-derive)](https://docs.rs/get-size-derive)
+[![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/DKerp/get-size/blob/main/get-size-derive/LICENSE)
+
 Derives [`GetSize`] for structs and enums.
 
 The derive macro will provide a costum implementation of the [`get_heap_size`] method, which will simply call [`get_heap_size`] on all contained values and add the values up. This implies that all values contained in the struct or enum most implement the [`GetSize`] trait themselves.
@@ -20,6 +24,48 @@ pub struct OwnStruct {
 // Does not implement GetSize, so we ignore it.
 pub struct ExternalStruct {
     value1: u8,
+}
+```
+
+You can also derive [`GetSize`] on structs and enums with generics. In that case the generated trait implementation will require all generic types to also implement [`GetSize`].
+
+This behavior may be unfavourable if one or more generic types are ignored duo to the corresponding struct field being ignored. In that case you can also use the `ignore` attribute at the struct level to specifiy the generic parameters which shall not be required to implement [`GetSize`] themselves.
+
+## Example
+
+```rust
+use get_size::GetSize;
+use get_size_derive::*;
+
+#[derive(GetSize)]
+#[get_size(ignore(B, C))]
+struct TestStructGenericsIgnore<A, B, C> {
+    value1: A,
+    #[get_size(ignore)]
+    value2: B,
+    #[get_size(ignore)]
+    value3: C,
+}
+
+// Does not implement GetSize, so we ignore it.
+struct TestStructNoGetSize {
+    value: String,
+}
+
+fn main() {
+    let no_impl = TestStructNoGetSize {
+        value: "World!".into(),
+    };
+
+    // If we did not ignore the C type, the following would not implement
+    // GetSize since C does not implement it.
+    let test: TestStructGenericsIgnore<String, u64, TestStructNoGetSize> = TestStructGenericsIgnore {
+        value1: "Hello".into(),
+        value2: 123,
+        value3: no_impl,
+    };
+
+    assert_eq!(test.get_heap_size(), 5);
 }
 ```
 

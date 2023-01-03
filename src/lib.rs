@@ -152,7 +152,7 @@ where
 {
     fn get_heap_size(&self) -> usize {
         match self {
-            Self::Borrowed(borrowed) => GetSize::get_heap_size(borrowed),
+            Self::Borrowed(borrowed) => 0,
             Self::Owned(owned) => GetSize::get_heap_size(owned),
         }
     }
@@ -267,17 +267,7 @@ impl<T, const SIZE: usize> GetSize for [T; SIZE] where T: GetSize {
     }
 }
 
-impl<T> GetSize for &[T] where T: GetSize {
-    fn get_heap_size(&self) -> usize {
-        let mut total = 0;
-
-        for element in self.iter() {
-            total += GetSize::get_size(element);
-        }
-
-        total
-    }
-}
+impl<T> GetSize for &[T] where T: GetSize {}
 
 impl<T> GetSize for &T {}
 impl<T> GetSize for &mut T {}
@@ -343,11 +333,7 @@ impl GetSize for String {
     }
 }
 
-impl GetSize for &str {
-    fn get_heap_size(&self) -> usize {
-        GetSize::get_heap_size(&self.as_bytes())
-    }
-}
+impl GetSize for &str {}
 
 impl GetSize for std::ffi::CString {
     fn get_heap_size(&self) -> usize {
@@ -421,8 +407,4 @@ impl GetSize for std::path::PathBuf {
 
 #[cfg(unix)]
 #[cfg_attr(docsrs, doc(cfg(unix)))]
-impl GetSize for &std::path::Path {
-    fn get_heap_size(&self) -> usize {
-        GetSize::get_heap_size(&self.as_os_str())
-    }
-}
+impl GetSize for &std::path::Path {}
