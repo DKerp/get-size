@@ -16,6 +16,12 @@ This library follows the idea that only bytes owned by a certain object should b
 
 ```rust
 use get_size::GetSize;
+use get_size_derive::*;
+
+#[derive(GetSize)]
+struct Test<'a> {
+  value: &'a String,
+}
 
 fn main() {
   let value = String::from("hello");
@@ -23,7 +29,23 @@ fn main() {
   // This string occupies 5 bytes at the heap, but a pointer is treated as not occupying
   // anything at the heap.
   assert_eq!(value.get_heap_size(), 5);
-  assert_eq!((&value).get_heap_size(), 0);
+  assert_eq!(GetSize::get_heap_size(&&value), 0); // Fully qualified syntax
+
+  // WARNING: Duo to rust's automatic dereferencing, a simple pointer will be dereferenced
+  // to the original value, causing the borrowed bytes to be accounted for too.
+  assert_eq!((&value).get_heap_size(), 5);
+  // The above gets rewritten by to compiler into:
+  // assert_eq!(value.get_heap_size(), 5);
+
+  // Our derive macro uses fully qualified syntax, so auto-dereferencing does
+  // not occour.
+  let value = Test {
+    value: &value,
+  };
+
+  // The String is now only borrowed, leading to its heap bytes not being
+  // accounted for.
+  assert_eq!(value.get_heap_size(), 0);
 }
 ```
 
@@ -41,8 +63,9 @@ fn main() {
 
   // From a technical point of view, Arcs own the data they reference.
   // Given so their heap data gets accounted for too.
+  // Note that an Arc does store the String's stack bytes also inside the heap.
   let value = Arc::new(value);
-  assert_eq!(value.get_heap_size(), 5);
+  assert_eq!(value.get_heap_size(), std::mem::size_of::<String>() + 5);
 }
 ```
 
