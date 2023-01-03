@@ -8,6 +8,44 @@ Determine the size in bytes an object occupies inside RAM.
 
 The [`GetSize`] trait can be used to determine the size of an object inside the stack as well as in the heap. The [`size_of`](https://doc.rust-lang.org/std/mem/fn.size_of.html) function provided by the standard library can already be used to determine the size of an object in the stack, but many application (e.g. for caching) do also need to know the number of bytes occupied inside the heap, for which this library provides an appropriate trait.
 
+## Ownership based accounting
+
+This library follows the idea that only bytes owned by a certain object should be accounted for, and not bytes owned by different objects which are only borrowed. This means in particular that objects referenced by pointers are ignored.
+
+### Example
+
+```rust
+use get_size::GetSize;
+
+fn main() {
+  let value = String::from("hello");
+
+  // This string occupies 5 bytes at the heap, but a pointer is treated as not occupying
+  // anything at the heap.
+  assert_eq!(value.get_heap_size(), 5);
+  assert_eq!((&value).get_heap_size(), 0);
+}
+```
+
+On the other hand references implemented as shared ownership are treated as owned values. It is your responsibility to ensure that the bytes occupied by them are not counted twice in your application!
+
+### Example
+
+```rust
+use std::sync::Arc;
+use get_size::GetSize;
+
+fn main() {
+  let value = String::from("hello");
+  assert_eq!(value.get_heap_size(), 5);
+
+  // From a technical point of view, Arcs own the data they reference.
+  // Given so their heap data gets accounted for too.
+  let value = Arc::new(value);
+  assert_eq!(value.get_heap_size(), 5);
+}
+```
+
 ## How to implement
 
 The [`GetSize`] trait is already implemented for most objects defined by the standard library, like `Vec`, `HashMap`, `String` as well as all the primitive values, like `u8`, `i32` etc.
@@ -84,6 +122,48 @@ fn main() {
 
     let test = TestEnumNumber::One;
     assert_eq!(test.get_heap_size(), 0);
+}
+```
+
+You can also derive [`GetSize`] on structs and enums with generics. In that case the generated trait implementation will require all generic types to also implement [`GetSize`].
+
+This behavior may be unfavourable if one or more generic types are ignored duo to the corresponding struct field being ignored. In that case you can also use the `ignore` attribute at the struct level to specifiy the generic parameters which shall not be required to implement [`GetSize`] themselves.
+
+# Example
+
+```rust
+use get_size::GetSize;
+use get_size_derive::*;
+
+#[derive(GetSize)]
+#[get_size(ignore(B, C))]
+struct TestStructGenericsIgnore<A, B, C> {
+    value1: A,
+    #[get_size(ignore)]
+    value2: B,
+    #[get_size(ignore)]
+    value3: C,
+}
+
+// Does not implement GetSize, so we ignore it.
+struct TestStructNoGetSize {
+    value: String,
+}
+
+fn main() {
+    let no_impl = TestStructNoGetSize {
+        value: "World!".into(),
+    };
+
+    // If we did not ignore the C type, the following would not implement
+    // GetSize since C does not implement it.
+    let test: TestStructGenericsIgnore<String, u64, TestStructNoGetSize> = TestStructGenericsIgnore {
+        value1: "Hello".into(),
+        value2: 123,
+        value3: no_impl,
+    };
+
+    assert_eq!(test.get_heap_size(), 5);
 }
 ```
 
