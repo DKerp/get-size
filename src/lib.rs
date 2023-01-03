@@ -152,7 +152,7 @@ where
 {
     fn get_heap_size(&self) -> usize {
         match self {
-            Self::Borrowed(borrowed) => 0,
+            Self::Borrowed(_borrowed) => 0,
             Self::Owned(owned) => GetSize::get_heap_size(owned),
         }
     }
