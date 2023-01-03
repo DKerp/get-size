@@ -40,6 +40,78 @@ fn has_nested_flag_attribute_list(list: &Vec<syn::Attribute>, name: &'static str
     false
 }
 
+fn extract_ignored_generics_list(list: &Vec<syn::Attribute>) -> Vec<String> {
+    let mut collection = Vec::new();
+
+    for attr in list.iter() {
+        let mut list = extract_ignored_generics(attr);
+
+        collection.append(&mut list);
+    }
+
+    collection
+}
+
+fn extract_ignored_generics(attr: &syn::Attribute) -> Vec<String> {
+    let mut collection = Vec::new();
+
+    if let Ok(meta) = attr.parse_meta() {
+        if let Some(ident) = meta.path().get_ident() {
+            if &ident.to_string()!="get_size" {
+                return collection;
+            }
+            if let syn::Meta::List(list) = meta {
+                for nested in list.nested.iter() {
+                    if let syn::NestedMeta::Meta(nmeta) = nested {
+                        let ident = nmeta.path().get_ident().expect("Invalid attribute syntax! (no iden)");
+                        if &ident.to_string()!="ignore" {
+                            panic!("Invalid attribute syntax! Unknown name {:?}", ident.to_string());
+                        }
+
+                        if let syn::Meta::List(list) = nmeta {
+                            for nested in list.nested.iter() {
+                                if let syn::NestedMeta::Meta(nmeta) = nested {
+                                    if let syn::Meta::Path(path) = nmeta {
+                                        let path = path.get_ident().expect("Invalid attribute syntax! (no ident)").to_string();
+                                        collection.push(path);
+                                    }
+                                }
+                            }
+                        }
+
+                    }
+                }
+            }
+        }
+    }
+
+    collection
+}
+
+// Add a bound `T: GetSize` to every type parameter T, unless we ignore it.
+fn add_trait_bounds(
+    mut generics: syn::Generics,
+    ignored: &Vec<String>,
+) -> syn::Generics {
+    for param in &mut generics.params {
+        if let syn::GenericParam::Type(type_param) = param {
+            let name = type_param.ident.to_string();
+            let mut found = false;
+            for ignored in ignored.iter() {
+                if ignored==&name {
+                    found = true;
+                    break;
+                }
+            }
+            if found {
+                continue;
+            }
+            type_param.bounds.push(syn::parse_quote!(GetSize));
+        }
+    }
+    generics
+}
+
 
 
 #[proc_macro_derive(GetSize, attributes(get_size))]
@@ -50,6 +122,15 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
 
      // The name of the sruct.
     let name = &ast.ident;
+
+    // Extract all generics we shall ignore.
+    let ignored = extract_ignored_generics_list(&ast.attrs);
+
+    // Add a bound `T: GetSize` to every type parameter T.
+    let generics = add_trait_bounds(ast.generics, &ignored);
+
+    // Extract the generics of the struct/enum.
+    let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
 
     // Traverse the parsed data to generate the individual parts of the function.
     match ast.data {
@@ -137,7 +218,7 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
 
             // Build the trait implementation
             let gen = quote! {
-                impl GetSize for #name {
+                impl #impl_generics GetSize for #name #ty_generics #where_clause {
                     fn get_heap_size(&self) -> usize {
                         match self {
                             #(#cmds)*
@@ -175,7 +256,7 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
 
             // Build the trait implementation
             let gen = quote! {
-                impl GetSize for #name {
+                impl #impl_generics GetSize for #name #ty_generics #where_clause {
                     fn get_heap_size(&self) -> usize {
                         let mut total = 0;
 
