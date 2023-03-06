@@ -171,6 +171,26 @@ macro_rules! impl_size_set {
                     total += GetSize::get_size(v);
                 }
 
+                let additional: usize = self.capacity() - self.len();
+                total += additional * T::get_stack_size();
+
+                total
+            }
+        }
+    }
+}
+
+macro_rules! impl_size_set_no_capacity {
+    ($name:ident) => {
+        impl<T> GetSize for $name<T> where T: GetSize {
+            fn get_heap_size(&self) -> usize {
+                let mut total = 0;
+
+                for v in self.iter() {
+                    // We assume that value are hold inside the heap.
+                    total += GetSize::get_size(v);
+                }
+
                 total
             }
         }
@@ -189,18 +209,40 @@ macro_rules! impl_size_map {
                     total += GetSize::get_size(v);
                 }
 
+                let additional: usize = self.capacity() - self.len();
+                total += additional * K::get_stack_size();
+                total += additional * V::get_stack_size();
+
                 total
             }
         }
     }
 }
 
-impl_size_map!(BTreeMap);
-impl_size_set!(BTreeSet);
+macro_rules! impl_size_map_no_capacity {
+    ($name:ident) => {
+        impl<K, V> GetSize for $name<K, V> where K: GetSize, V: GetSize {
+            fn get_heap_size(&self) -> usize {
+                let mut total = 0;
+
+                for (k, v) in self.iter() {
+                    // We assume that keys and value are hold inside the heap.
+                    total += GetSize::get_size(k);
+                    total += GetSize::get_size(v);
+                }
+
+                total
+            }
+        }
+    }
+}
+
+impl_size_map_no_capacity!(BTreeMap);
+impl_size_set_no_capacity!(BTreeSet);
 impl_size_set!(BinaryHeap);
 impl_size_map!(HashMap);
 impl_size_set!(HashSet);
-impl_size_set!(LinkedList);
+impl_size_set_no_capacity!(LinkedList);
 impl_size_set!(VecDeque);
 
 impl_size_set!(Vec);
@@ -329,7 +371,7 @@ impl<T> GetSize for RwLock<T> where T: GetSize {
 
 impl GetSize for String {
     fn get_heap_size(&self) -> usize {
-        GetSize::get_heap_size(&self.as_bytes())
+        self.capacity()
     }
 }
 
@@ -337,34 +379,25 @@ impl GetSize for &str {}
 
 impl GetSize for std::ffi::CString {
     fn get_heap_size(&self) -> usize {
-        GetSize::get_heap_size(&self.as_bytes_with_nul())
+        self.as_bytes_with_nul().len()
     }
 }
 
 impl GetSize for &std::ffi::CStr {
     fn get_heap_size(&self) -> usize {
-        GetSize::get_heap_size(&self.to_bytes_with_nul())
+        self.to_bytes_with_nul().len()
     }
 }
 
-#[cfg(unix)]
-#[cfg_attr(docsrs, doc(cfg(unix)))]
 impl GetSize for std::ffi::OsString {
     fn get_heap_size(&self) -> usize {
-        let slice: &std::ffi::OsStr = self.as_ref();
-        let slice = std::os::unix::ffi::OsStrExt::as_bytes(slice);
-
-        GetSize::get_heap_size(&slice)
+        self.len()
     }
 }
 
-#[cfg(unix)]
-#[cfg_attr(docsrs, doc(cfg(unix)))]
 impl GetSize for &std::ffi::OsStr {
     fn get_heap_size(&self) -> usize {
-        let slice = std::os::unix::ffi::OsStrExt::as_bytes(*self);
-
-        GetSize::get_heap_size(&slice)
+        self.len()
     }
 }
 
@@ -379,7 +412,7 @@ impl GetSize for std::fs::ReadDir {}
 
 impl<T> GetSize for std::io::BufReader<T> where T: GetSize {
     fn get_heap_size(&self) -> usize {
-        let mut total = GetSize::get_size(self.get_ref());
+        let mut total = GetSize::get_heap_size(self.get_ref());
 
         total += self.capacity();
 
@@ -389,7 +422,7 @@ impl<T> GetSize for std::io::BufReader<T> where T: GetSize {
 
 impl<T> GetSize for std::io::BufWriter<T> where T: GetSize + std::io::Write {
     fn get_heap_size(&self) -> usize {
-        let mut total = GetSize::get_size(self.get_ref());
+        let mut total = GetSize::get_heap_size(self.get_ref());
 
         total += self.capacity();
 
@@ -397,14 +430,10 @@ impl<T> GetSize for std::io::BufWriter<T> where T: GetSize + std::io::Write {
     }
 }
 
-#[cfg(unix)]
-#[cfg_attr(docsrs, doc(cfg(unix)))]
 impl GetSize for std::path::PathBuf {
     fn get_heap_size(&self) -> usize {
-        GetSize::get_heap_size(&self.as_path())
+        self.capacity()
     }
 }
 
-#[cfg(unix)]
-#[cfg_attr(docsrs, doc(cfg(unix)))]
 impl GetSize for &std::path::Path {}
