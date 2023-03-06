@@ -103,8 +103,12 @@ fn derive_enum() {
     let test = TestEnum::Variant3(-12, vec![1, 2, 3]);
     assert_eq!(test.get_heap_size(), 6);
 
-    let test = TestEnum::Variant4("Test".into(), -123, vec![1, 2, 3, 4], false, "Hello world!");
-    assert_eq!(test.get_heap_size(), 4 + 16 + 12);
+    let s: String = "Test".into();
+    assert_eq!(s.get_heap_size(), 4);
+    let v = vec![1, 2, 3, 4];
+    assert_eq!(v.get_heap_size(), 16);
+    let test = TestEnum::Variant4(s, -123, v, false, "Hello world!");
+    assert_eq!(test.get_heap_size(), 4 + 16);
 
     let test_struct = TestStruct {
         value1: "Hello world".into(),
