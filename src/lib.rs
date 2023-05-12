@@ -437,3 +437,14 @@ impl GetSize for std::path::PathBuf {
 }
 
 impl GetSize for &std::path::Path {}
+
+impl<T> GetSize for Box<[T]> {
+    fn get_heap_size(&self) -> usize {
+        let mut total = 0;
+        for item in self.iter() {
+            total += item.get_size()
+        }
+
+        total
+    }
+}
