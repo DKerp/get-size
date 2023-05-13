@@ -197,3 +197,13 @@ fn derive_enum_c_style() {
     let test = TestEnum2::Two;
     assert_eq!(test.get_heap_size(), 0);
 }
+
+
+#[derive(GetSize)]
+pub struct TestNewType(u64);
+
+#[test]
+fn derive_newtype() {
+    let test = TestNewType(0);
+    assert_eq!(u64::get_stack_size(), test.get_size());
+}

@@ -240,6 +240,8 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
 
             let mut cmds = Vec::with_capacity(data_struct.fields.len());
 
+            let mut unidentified_fields_count = 0; // For newtypes
+
             for field in data_struct.fields.iter() {
 
                 // Check if the value should be ignored. If so skip it.
@@ -247,11 +249,18 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
                     continue;
                 }
 
-                let ident = field.ident.as_ref().unwrap();
+                if let Some(ident) = field.ident.as_ref() {
+                    cmds.push(quote! {
+                        total += GetSize::get_heap_size(&self.#ident);
+                    });
+                } else {
+                    let current_index = syn::Index::from(unidentified_fields_count);
+                    cmds.push(quote! {
+                        total += GetSize::get_heap_size(&self.#current_index);
+                    });
 
-                cmds.push(quote! {
-                    total += GetSize::get_heap_size(&self.#ident);
-                })
+                    unidentified_fields_count += 1;
+                }
             }
 
             // Build the trait implementation
