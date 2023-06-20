@@ -14,8 +14,9 @@ categories = ["memory-management", "caching"]
 proc-macro = true
 
 [dependencies]
-syn = { version = "^1", features = ["derive"] }
+syn = { version = "^2", features = ["derive", "parsing"] }
 quote = "^1"
+attribute-derive = "^0.6"
 
 [dev-dependencies]
 get-size = "^0.1"

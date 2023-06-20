@@ -16,6 +16,7 @@ fn derive_struct() {
     assert_eq!(test.get_heap_size(), 5);
 }
 
+
 #[derive(GetSize)]
 pub struct TestStructGenerics<A, B> {
     value1: A,
@@ -31,6 +32,7 @@ fn derive_struct_with_generics() {
 
     assert_eq!(test.get_heap_size(), 5);
 }
+
 
 #[derive(GetSize)]
 #[get_size(ignore(B, C))]
@@ -63,6 +65,38 @@ fn derive_struct_with_generics_and_ignore() {
     assert_eq!(test.get_heap_size(), 5);
 }
 
+
+#[derive(GetSize)]
+#[get_size(ignore(B, C))]
+#[allow(dead_code)]
+struct TestStructHelpers<A, B, C> {
+    value1: A,
+    #[get_size(size = 100)]
+    value2: B,
+    #[get_size(size_fn = get_size_helper)]
+    value3: C,
+}
+
+fn get_size_helper<C>(_value: &C) -> usize {
+    50
+}
+
+#[test]
+fn derive_struct_with_generics_and_helpers() {
+    let no_impl = TestStructNoGetSize {
+        value: "World!".into(),
+    };
+
+    let test: TestStructHelpers<String, u64, TestStructNoGetSize> = TestStructHelpers {
+        value1: "Hello".into(),
+        value2: 123,
+        value3: no_impl,
+    };
+
+    assert_eq!(test.get_heap_size(), 5 + 100 + 50);
+}
+
+
 #[derive(GetSize)]
 pub struct TestStructGenericsLifetimes<'a, A, B> {
     value1: A,
@@ -80,6 +114,7 @@ fn derive_struct_with_generics_and_lifetimes() {
 
     assert_eq!(test.get_heap_size(), 5);
 }
+
 
 #[derive(GetSize)]
 pub enum TestEnum {
@@ -124,6 +159,7 @@ fn derive_enum() {
     let test = TestEnum::Variant7{x: "Hello".into(), y: "world".into()};
     assert_eq!(test.get_heap_size(), 5 + 5);
 }
+
 
 #[derive(GetSize)]
 pub enum TestEnumGenerics<'a, A, B, C> {
@@ -178,6 +214,7 @@ fn derive_enum_generics_issue1() {
     let test: Node<u64> = Node::Nodes(Box::new([t1,t2,t3,t4,t5,t6,t7,t8]));
     assert_eq!(test.get_heap_size(), 8*std::mem::size_of::<Node<u64>>());
 }
+
 
 #[derive(GetSize)]
 pub enum TestEnum2 {
