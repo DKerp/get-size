@@ -200,14 +200,6 @@ In same cases you may be dealing with external types which allocate a fixed amou
 
 ```rust
 use get_size::GetSize;
-#
-# struct Buffer1024 {}
-#
-# impl Buffer1024 {
-#   fn new() -> Self {
-#      Self {}
-#   }
-# }
 
 #[derive(GetSize)]
 struct TestStruct {
@@ -236,8 +228,6 @@ Note that unlike in other crates, the name of the function to be called is __not
 
 ```rust
 use get_size::GetSize;
-#
-# type ExternalVecAlike<T> = Vec<T>;
 
 #[derive(GetSize)]
 struct TestStruct {
