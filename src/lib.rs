@@ -147,7 +147,7 @@ impl GetSize for SystemTime {}
 
 impl<'a, T> GetSize for Cow<'a, T>
 where
-    T: ToOwned + GetSize,
+    T: ToOwned,
     <T as ToOwned>::Owned: GetSize,
 {
     fn get_heap_size(&self) -> usize {

@@ -21,39 +21,6 @@ struct StructFieldAttribute {
 
 
 
-// fn has_nested_flag_attribute(attr: &syn::Attribute, name: &'static str, flag: &'static str) -> bool {
-//     if let Ok(meta) = attr.parse_meta() {
-//         if let Some(ident) = meta.path().get_ident() {
-//             if &ident.to_string()==name {
-//                 if let syn::Meta::List(list) = meta {
-//                     for nested in list.nested.iter() {
-//                         if let syn::NestedMeta::Meta(nmeta) = nested {
-//                             if let syn::Meta::Path(path) = nmeta {
-//                                 let path = path.get_ident().expect("Invalid attribute syntax! (no ident)").to_string();
-//                                 if &path==flag {
-//                                     return true
-//                                 }
-//                             }
-//                         }
-//                     }
-//                 }
-//             }
-//         }
-//     }
-//
-//     false
-// }
-//
-// fn has_nested_flag_attribute_list(list: &Vec<syn::Attribute>, name: &'static str, flag: &'static str) -> bool {
-//     for attr in list.iter() {
-//         if has_nested_flag_attribute(attr, name, flag) {
-//             return true;
-//         }
-//     }
-//
-//     false
-// }
-
 fn extract_ignored_generics_list(list: &Vec<syn::Attribute>) -> Vec<syn::PathSegment> {
     let mut collection = Vec::new();
 
@@ -95,43 +62,6 @@ fn extract_ignored_generics(attr: &syn::Attribute) -> Vec<syn::PathSegment> {
 
         Ok(())
     }).unwrap();
-
-    // // Parse the list, which is a nested meta.
-    // let meta: syn::Meta = list.parse_args().unwrap();
-    //
-    // // Skip the attribute, if it does not list the ignored generics.
-    // if !meta.path().is_ident("ignore") {
-    //     return collection;
-    // }
-    //
-    // // Make sure it is a list, again.
-    // let list = attr.meta.require_list().unwrap();
-    //
-    // if let syn::Meta::List(list) = attr.meta {
-    //     let meta: syn::Meta = list.parse_args().unwrap();
-    //
-    //     if meta.path().
-    //     for nested in list.nested.iter() {
-    //         if let syn::NestedMeta::Meta(nmeta) = nested {
-    //             let ident = nmeta.path().get_ident().expect("Invalid attribute syntax! (no iden)");
-    //             if &ident.to_string()!="ignore" {
-    //                 panic!("Invalid attribute syntax! Unknown name {:?}", ident.to_string());
-    //             }
-    //
-    //             if let syn::Meta::List(list) = nmeta {
-    //                 for nested in list.nested.iter() {
-    //                     if let syn::NestedMeta::Meta(nmeta) = nested {
-    //                         if let syn::Meta::Path(path) = nmeta {
-    //                             let path = path.get_ident().expect("Invalid attribute syntax! (no ident)").to_string();
-    //                             collection.push(path);
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //
-    //         }
-    //     }
-    // }
 
     collection
 }
@@ -292,11 +222,6 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
             let mut unidentified_fields_count = 0; // For newtypes
 
             for field in data_struct.fields.iter() {
-
-                // // Check if the value should be ignored. If so skip it.
-                // if has_nested_flag_attribute_list(&field.attrs, "get_size", "ignore") {
-                //     continue;
-                // }
 
                 // Parse all relevant attributes.
                 let attr = StructFieldAttribute::from_attributes(&field.attrs).unwrap();

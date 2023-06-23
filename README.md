@@ -8,15 +8,38 @@ Determine the size in bytes an object occupies inside RAM.
 
 The [`GetSize`] trait can be used to determine the size of an object inside the stack as well as in the heap. The [`size_of`](https://doc.rust-lang.org/std/mem/fn.size_of.html) function provided by the standard library can already be used to determine the size of an object in the stack, but many application (e.g. for caching) do also need to know the number of bytes occupied inside the heap, for which this library provides an appropriate trait.
 
+##### Example
+
+We use [`GetSize`] to determine number of bytes occupied by both a `String` and a `Vec` of bytes. Note that the `Vec` has already allocated a capacity of `1024` bytes, and does thus correctly show a heap size of `1024`, even if only `1` byte is currently in use.
+
+```rust
+use get_size::GetSize;
+
+fn main() {
+  let value = String::from("Hello World!");
+
+  assert_eq!(String::get_stack_size(), std::mem::size_of::<String>());
+  assert_eq!(value.get_heap_size(), 12);
+
+  assert_eq!(value.get_size(), std::mem::size_of::<String>() + 12);
+
+
+  let mut buffer = Vec::with_capacity(1024); // 1KB allocated on the heap.
+  buffer.push(1u8); // 1 byte in use.
+
+  assert_eq!(buffer.len(), 1);
+  assert_eq!(buffer.get_heap_size(), 1024);
+}
+```
+
 ## Ownership based accounting
 
 This library follows the idea that only bytes owned by a certain object should be accounted for, and not bytes owned by different objects which are only borrowed. This means in particular that objects referenced by pointers are ignored.
 
-### Example
+##### Example
 
 ```rust
 use get_size::GetSize;
-use get_size_derive::*;
 
 #[derive(GetSize)]
 struct Test<'a> {
@@ -49,9 +72,9 @@ fn main() {
 }
 ```
 
-On the other hand references implemented as shared ownership are treated as owned values. It is your responsibility to ensure that the bytes occupied by them are not counted twice in your application!
+On the other hand references implemented as shared ownership are treated as owned values. It is your responsibility to ensure that the bytes occupied by them are not counted twice in your application. The `ignore` attribute might be helpful, [see below](#ignoring-certain-values).
 
-### Example
+##### Example
 
 ```rust
 use std::sync::Arc;
@@ -81,9 +104,11 @@ You will need to activate the `derive` feature first, which is disabled by defau
 get-size = { version = "^0.1", features = ["derive"] }
 ```
 
-Then you can easily derive [`GetSize`]. If you want the derive macro to ignore a certain struct field you can add the `ignore` attribute to it. This might be usefull if some values do not implement the [`GetSize`] trait and do not have data on the heap, or if the data on the heap has already been accounted for somewhere else.
+Note that the derive macro _does not support unions_. You have to manually implement it for them.
 
-### Example
+### Examples
+
+Deriving [`GetSize`] for a struct:
 
 ```rust
 use get_size::GetSize;
@@ -92,29 +117,19 @@ use get_size::GetSize;
 pub struct OwnStruct {
     value1: String,
     value2: u64,
-    #[get_size(ignore)]
-    value3: ExternalStruct,
-}
-
-// Does not implement GetSize, so we ignore it.
-pub struct ExternalStruct {
-    value1: u8,
 }
 
 fn main() {
     let test = OwnStruct {
         value1: "Hello".into(),
         value2: 123,
-        value3: ExternalStruct{ value1: 255 },
     };
 
     assert_eq!(test.get_heap_size(), 5);
 }
 ```
 
-As already mentioned you can also derive [`GetSize`] for enums.
-
-### Example
+Deriving [`GetSize`] for an enum:
 
 ```rust
 use get_size::GetSize;
@@ -152,49 +167,239 @@ fn main() {
 }
 ```
 
-You can also derive [`GetSize`] on structs and enums with generics. In that case the generated trait implementation will require all generic types to also implement [`GetSize`].
-
-This behavior may be unfavourable if one or more generic types are ignored duo to the corresponding struct field being ignored. In that case you can also use the `ignore` attribute at the struct level to specifiy the generic parameters which shall not be required to implement [`GetSize`] themselves.
-
-### Example
+The derive macro does also work with generics. The generated trait implementation will by default require all generic types to implement [`GetSize`] themselves, but this [can be changed](#ignoring-certain-generic-types).
 
 ```rust
 use get_size::GetSize;
-use get_size_derive::*;
 
 #[derive(GetSize)]
-#[get_size(ignore(B, C))]
-struct TestStructGenericsIgnore<A, B, C> {
+struct TestStructGenerics<A, B> {
     value1: A,
-    #[get_size(ignore)]
     value2: B,
-    #[get_size(ignore)]
-    value3: C,
 }
 
-// Does not implement GetSize, so we ignore it.
+#[derive(GetSize)]
+enum TestEnumGenerics<A, B> {
+  Variant1(A),
+  Variant2(B),
+}
+
+fn main() {
+    let test: TestStructGenerics<String, u64> = TestStructGenerics {
+        value1: "Hello".into(),
+        value2: 123,
+    };
+
+    assert_eq!(test.get_heap_size(), 5);
+
+    let test = String::from("Hello");
+    let test: TestEnumGenerics<String, u64> = TestEnumGenerics::Variant1(test);
+
+    assert_eq!(test.get_heap_size(), 5);
+
+    let test: TestEnumGenerics<String, u64> = TestEnumGenerics::Variant2(100);
+
+    assert_eq!(test.get_heap_size(), 0);
+}
+```
+
+### Dealing with external types which do not implement GetSize
+
+Deriving [`GetSize`] is straight forward if all the types contained in your data structure implement [`GetSize`] themselves, but this might not always be the case. For that reason the derive macro offers some helpers to assist you in that case.
+
+Note that the helpers are currently only available for regular structs, that is they do neither support tuple structs nor enums.
+
+#### Ignoring certain values
+
+You can tell the derive macro to ignore certain struct fields by adding the `ignore` attribute to them. The generated implementation of [`get_heap_size`] will then simple skip this field.
+
+##### Example
+
+The idiomatic use case for this helper is if you use shared ownership and do not want your data to be counted twice.
+
+```rust
+use std::sync::Arc;
+use get_size::GetSize;
+
+#[derive(GetSize)]
+struct PrimaryStore {
+  id: u64,
+  shared_data: Arc<Vec<u8>>,
+}
+
+#[derive(GetSize)]
+struct SecondaryStore {
+  id: u64,
+  #[get_size(ignore)]
+  shared_data: Arc<Vec<u8>>,
+}
+
+fn main() {
+  let shared_data = Arc::new(Vec::with_capacity(1024));
+
+  let primary_data = PrimaryStore {
+    id: 1,
+    shared_data: Arc::clone(&shared_data),
+  };
+
+  let secondary_data = SecondaryStore {
+    id: 2,
+    shared_data,
+  };
+
+  // Note that Arc does also store the Vec's stack data on the heap.
+  assert_eq!(primary_data.get_heap_size(), Vec::<u8>::get_stack_size() + 1024);
+  assert_eq!(secondary_data.get_heap_size(), 0);
+}
+```
+
+##### Example
+
+But you may also use this as a band aid, if a certain struct fields type does not implement [`GetSize`].
+
+Be aware though that this will result in an implementation which will return incorrect results, unless the heap size of that type is indeed always zero and can thus be ignored. It is therefor advisable to use one of the next two helper options instead.
+
+```rust
+use get_size::GetSize;
+
+// Does not implement GetSize!
 struct TestStructNoGetSize {
     value: String,
 }
 
+// Implements GetSize, even through one field's type does not implement it.
+#[derive(GetSize)]
+struct TestStruct {
+  name: String,
+  #[get_size(ignore)]
+  ignored_value: TestStructNoGetSize,
+}
+
 fn main() {
-    let no_impl = TestStructNoGetSize {
-        value: "World!".into(),
-    };
+  let ignored_value = TestStructNoGetSize {
+    value: "Hello world!".into(),
+  };
 
-    // If we did not ignore the C type, the following would not implement
-    // GetSize since C does not implement it.
-    let test: TestStructGenericsIgnore<String, u64, TestStructNoGetSize> = TestStructGenericsIgnore {
-        value1: "Hello".into(),
-        value2: 123,
-        value3: no_impl,
-    };
+  let test = TestStruct {
+    name: "Adam".into(),
+    ignored_value,
+  };
 
-    assert_eq!(test.get_heap_size(), 5);
+  // Note that the result is lower then it should be.
+  assert_eq!(test.get_heap_size(), 4);
 }
 ```
 
-Note that the derive macro does not support unions. You have to manually implement it for them.
+#### Returning a fixed value
+
+In same cases you may be dealing with external types which allocate a fixed amount of bytes at the heap. In this case you may use the `size` attribute to always account the given field with a fixed value.
+
+```rust
+use get_size::GetSize;
+#
+# struct Buffer1024 {}
+#
+# impl Buffer1024 {
+#   fn new() -> Self {
+#      Self {}
+#   }
+# }
+
+#[derive(GetSize)]
+struct TestStruct {
+  id: u64,
+  #[get_size(size = 1024)]
+  buffer: Buffer1024, // Always allocates exactly 1KB at the heap.
+}
+
+fn main() {
+  let test = TestStruct {
+    id: 1,
+    buffer: Buffer1024::new(),
+  };
+
+  assert_eq!(test.get_heap_size(), 1024);
+}
+```
+
+#### Using a helper function
+
+In same cases you may be dealing with an external data structure for which you know how to calculate its heap size using its public methods. In that case you may either use the newtype pattern to implement [`GetSize`] for it directly, or you can use the `size_fn` attribute, which will call the given function in order to calculate the fields heap size.
+
+The latter is especially usefull if you can make use of a certain trait to calculate the heap size for multiple types.
+
+Note that unlike in other crates, the name of the function to be called is __not__ encapsulated by double-quotes ("), but rather given directly.
+
+```rust
+use get_size::GetSize;
+#
+# type ExternalVecAlike<T> = Vec<T>;
+
+#[derive(GetSize)]
+struct TestStruct {
+  id: u64,
+  #[get_size(size_fn = vec_alike_helper)]
+  buffer: ExternalVecAlike<u8>,
+}
+
+// NOTE: We assume that slice.len()==slice.capacity()
+fn vec_alike_helper<V, T>(slice: &V) -> usize
+where
+  V: AsRef<[T]>,
+{
+  std::mem::size_of::<T>() * slice.as_ref().len()
+}
+
+fn main() {
+  let buffer = vec![0u8; 512];
+  let buffer: ExternalVecAlike<u8> = buffer.into();
+
+  let test = TestStruct {
+    id: 1,
+    buffer,
+  };
+
+  assert_eq!(test.get_heap_size(), 512);
+}
+```
+
+#### Ignoring certain generic types
+
+If your struct uses generics, but the fields at which they are stored are ignored or get handled by helpers because the generic does not implement [`GetSize`], you will have to mark these generics with a special struct level `ignore` attribute. Otherwise the derived [`GetSize`] implementation would still require these generics to implement [`GetSize`], even through there is no need for it.
+
+```rust
+use get_size::GetSize;
+
+#[derive(GetSize)]
+#[get_size(ignore(B, C, D))]
+struct TestStructHelpers<A, B, C, D> {
+    value1: A,
+    #[get_size(size = 100)]
+    value2: B,
+    #[get_size(size_fn = get_size_helper)]
+    value3: C,
+    #[get_size(ignore)]
+    value4: D,
+}
+
+// Does not implement GetSize
+struct NoGS {}
+
+fn get_size_helper<C>(_value: &C) -> usize {
+    50
+}
+
+fn main() {
+    let test: TestStructHelpers<String, NoGS, NoGS, u64> = TestStructHelpers {
+        value1: "Hello".into(),
+        value2: NoGS {},
+        value3: NoGS {},
+        value4: 123,
+    };
+
+    assert_eq!(test.get_heap_size(), 5 + 100 + 50);
+}
+```
 
 ## License
 
