@@ -4,43 +4,24 @@
 use proc_macro::TokenStream;
 use quote::quote;
 use syn;
+use attribute_derive::Attribute;
 
 
 
-fn has_nested_flag_attribute(attr: &syn::Attribute, name: &'static str, flag: &'static str) -> bool {
-    if let Ok(meta) = attr.parse_meta() {
-        if let Some(ident) = meta.path().get_ident() {
-            if &ident.to_string()==name {
-                if let syn::Meta::List(list) = meta {
-                    for nested in list.nested.iter() {
-                        if let syn::NestedMeta::Meta(nmeta) = nested {
-                            if let syn::Meta::Path(path) = nmeta {
-                                let path = path.get_ident().expect("Invalid attribute syntax! (no ident)").to_string();
-                                if &path==flag {
-                                    return true
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    false
+#[derive(Attribute, Default, Debug)]
+#[attribute(ident = get_size)]
+struct StructFieldAttribute {
+    #[attribute(conflicts = [size_fn, ignore])]
+    size: Option<usize>,
+    #[attribute(conflicts = [size, ignore])]
+    size_fn: Option<syn::Ident>,
+    #[attribute(conflicts = [size, size_fn])]
+    ignore: bool,
 }
 
-fn has_nested_flag_attribute_list(list: &Vec<syn::Attribute>, name: &'static str, flag: &'static str) -> bool {
-    for attr in list.iter() {
-        if has_nested_flag_attribute(attr, name, flag) {
-            return true;
-        }
-    }
 
-    false
-}
 
-fn extract_ignored_generics_list(list: &Vec<syn::Attribute>) -> Vec<String> {
+fn extract_ignored_generics_list(list: &Vec<syn::Attribute>) -> Vec<syn::PathSegment> {
     let mut collection = Vec::new();
 
     for attr in list.iter() {
@@ -52,38 +33,35 @@ fn extract_ignored_generics_list(list: &Vec<syn::Attribute>) -> Vec<String> {
     collection
 }
 
-fn extract_ignored_generics(attr: &syn::Attribute) -> Vec<String> {
+fn extract_ignored_generics(attr: &syn::Attribute) -> Vec<syn::PathSegment> {
     let mut collection = Vec::new();
 
-    if let Ok(meta) = attr.parse_meta() {
-        if let Some(ident) = meta.path().get_ident() {
-            if &ident.to_string()!="get_size" {
-                return collection;
-            }
-            if let syn::Meta::List(list) = meta {
-                for nested in list.nested.iter() {
-                    if let syn::NestedMeta::Meta(nmeta) = nested {
-                        let ident = nmeta.path().get_ident().expect("Invalid attribute syntax! (no iden)");
-                        if &ident.to_string()!="ignore" {
-                            panic!("Invalid attribute syntax! Unknown name {:?}", ident.to_string());
-                        }
-
-                        if let syn::Meta::List(list) = nmeta {
-                            for nested in list.nested.iter() {
-                                if let syn::NestedMeta::Meta(nmeta) = nested {
-                                    if let syn::Meta::Path(path) = nmeta {
-                                        let path = path.get_ident().expect("Invalid attribute syntax! (no ident)").to_string();
-                                        collection.push(path);
-                                    }
-                                }
-                            }
-                        }
-
-                    }
-                }
-            }
-        }
+    // Skip all attributes which do not belong to us.
+    if !attr.meta.path().is_ident("get_size") {
+        return collection;
     }
+
+    // Make sure it is a list.
+    let list = attr.meta.require_list().unwrap();
+
+    // Parse the nested meta.
+    // #[get_size(ignore(A, B))]
+    list.parse_nested_meta(|meta| {
+        // We only parse the ignore attributes.
+        if !meta.path.is_ident("ignore") {
+            return Ok(()); // Just skip.
+        }
+
+        meta.parse_nested_meta(|meta| {
+            for segment in meta.path.segments {
+                collection.push(segment);
+            }
+
+            Ok(())
+        })?;
+
+        Ok(())
+    }).unwrap();
 
     collection
 }
@@ -91,21 +69,22 @@ fn extract_ignored_generics(attr: &syn::Attribute) -> Vec<String> {
 // Add a bound `T: GetSize` to every type parameter T, unless we ignore it.
 fn add_trait_bounds(
     mut generics: syn::Generics,
-    ignored: &Vec<String>,
+    ignored: &Vec<syn::PathSegment>,
 ) -> syn::Generics {
     for param in &mut generics.params {
         if let syn::GenericParam::Type(type_param) = param {
-            let name = type_param.ident.to_string();
             let mut found = false;
             for ignored in ignored.iter() {
-                if ignored==&name {
+                if ignored.ident==type_param.ident {
                     found = true;
                     break;
                 }
             }
+
             if found {
                 continue;
             }
+
             type_param.bounds.push(syn::parse_quote!(GetSize));
         }
     }
@@ -244,8 +223,25 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
 
             for field in data_struct.fields.iter() {
 
-                // Check if the value should be ignored. If so skip it.
-                if has_nested_flag_attribute_list(&field.attrs, "get_size", "ignore") {
+                // Parse all relevant attributes.
+                let attr = StructFieldAttribute::from_attributes(&field.attrs).unwrap();
+
+                // NOTE There will be no attributes if this is a tuple struct.
+                if let Some(size) = attr.size {
+                    cmds.push(quote! {
+                        total += #size;
+                    });
+
+                    continue;
+                } else if let Some(size_fn) = attr.size_fn {
+                    let ident = field.ident.as_ref().unwrap();
+
+                    cmds.push(quote! {
+                        total += #size_fn(&self.#ident);
+                    });
+
+                    continue;
+                } else if attr.ignore {
                     continue;
                 }
 
