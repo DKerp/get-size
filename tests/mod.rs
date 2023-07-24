@@ -1,4 +1,6 @@
-use super::*;
+use std::{collections::BTreeSet, rc::Rc, sync::Arc};
+
+use get_size::*;
 
 #[derive(GetSize)]
 pub struct TestStruct {
@@ -13,7 +15,7 @@ fn derive_struct() {
         value2: 123,
     };
 
-    assert_eq!(test.get_heap_size(), 5);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 5);
 }
 
 #[derive(GetSize)]
@@ -29,7 +31,7 @@ fn derive_struct_with_generics() {
         value2: 123,
     };
 
-    assert_eq!(test.get_heap_size(), 5);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 5);
 }
 
 #[derive(GetSize)]
@@ -61,7 +63,7 @@ fn derive_struct_with_generics_and_ignore() {
             value3: no_impl,
         };
 
-    assert_eq!(test.get_heap_size(), 5);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 5);
 }
 
 #[derive(GetSize)]
@@ -91,7 +93,7 @@ fn derive_struct_with_generics_and_helpers() {
         value3: no_impl,
     };
 
-    assert_eq!(test.get_heap_size(), 5 + 100 + 50);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 5 + 100 + 50);
 }
 
 #[derive(GetSize)]
@@ -109,7 +111,7 @@ fn derive_struct_with_generics_and_lifetimes() {
         value2: &value,
     };
 
-    assert_eq!(test.get_heap_size(), 5);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 5);
 }
 
 #[derive(GetSize)]
@@ -126,20 +128,20 @@ pub enum TestEnum {
 #[test]
 fn derive_enum() {
     let test = TestEnum::Variant1(1, 2, 3);
-    assert_eq!(test.get_heap_size(), 0);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 0);
 
     let test = TestEnum::Variant2("Hello".into());
-    assert_eq!(test.get_heap_size(), 5);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 5);
 
     let test = TestEnum::Variant3(-12, vec![1, 2, 3]);
-    assert_eq!(test.get_heap_size(), 6);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 6);
 
     let s: String = "Test".into();
-    assert_eq!(s.get_heap_size(), 4);
+    assert_eq!(s.get_heap_size(&mut GetSizeNoTracker), 4);
     let v = vec![1, 2, 3, 4];
-    assert_eq!(v.get_heap_size(), 16);
+    assert_eq!(v.get_heap_size(&mut GetSizeNoTracker), 16);
     let test = TestEnum::Variant4(s, -123, v, false, "Hello world!");
-    assert_eq!(test.get_heap_size(), 4 + 16);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 4 + 16);
 
     let test_struct = TestStruct {
         value1: "Hello world".into(),
@@ -147,16 +149,16 @@ fn derive_enum() {
     };
 
     let test = TestEnum::Variant5(12.34, test_struct);
-    assert_eq!(test.get_heap_size(), 11);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 11);
 
     let test = TestEnum::Variant6;
-    assert_eq!(test.get_heap_size(), 0);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 0);
 
     let test = TestEnum::Variant7 {
         x: "Hello".into(),
         y: "world".into(),
     };
-    assert_eq!(test.get_heap_size(), 5 + 5);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 5 + 5);
 }
 
 #[derive(GetSize)]
@@ -169,11 +171,11 @@ pub enum TestEnumGenerics<'a, A, B, C> {
 #[test]
 fn derive_enum_generics() {
     let test: TestEnumGenerics<u64, String, TestStruct> = TestEnumGenerics::Variant1(123);
-    assert_eq!(test.get_heap_size(), 0);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 0);
 
     let test: TestEnumGenerics<u64, String, TestStruct> =
         TestEnumGenerics::Variant2("Hello".into());
-    assert_eq!(test.get_heap_size(), 5);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 5);
 
     let test_struct = TestStruct {
         value1: "Hello world".into(),
@@ -181,7 +183,7 @@ fn derive_enum_generics() {
     };
 
     let test: TestEnumGenerics<u64, String, TestStruct> = TestEnumGenerics::Variant3(&test_struct);
-    assert_eq!(test.get_heap_size(), 0); // It is a pointer.
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 0); // It is a pointer.
 }
 
 const MINIMAL_NODE_SIZE: usize = 3;
@@ -199,10 +201,10 @@ where
 #[test]
 fn derive_enum_generics_issue1() {
     let test: Node<String> = Node::Block("test".into());
-    assert_eq!(test.get_heap_size(), 4);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 4);
 
     let test: Node<u64> = Node::Blocks(Box::new([123; 27]));
-    assert_eq!(test.get_heap_size(), 8 * 27);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 8 * 27);
 
     let t1: Node<u64> = Node::Block(123);
     let t2 = t1.clone();
@@ -213,7 +215,10 @@ fn derive_enum_generics_issue1() {
     let t7 = t1.clone();
     let t8 = t1.clone();
     let test: Node<u64> = Node::Nodes(Box::new([t1, t2, t3, t4, t5, t6, t7, t8]));
-    assert_eq!(test.get_heap_size(), 8 * std::mem::size_of::<Node<u64>>());
+    assert_eq!(
+        test.get_heap_size(&mut GetSizeNoTracker),
+        8 * std::mem::size_of::<Node<u64>>()
+    );
 }
 
 #[derive(GetSize)]
@@ -226,13 +231,13 @@ pub enum TestEnum2 {
 #[test]
 fn derive_enum_c_style() {
     let test = TestEnum2::Zero;
-    assert_eq!(test.get_heap_size(), 0);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 0);
 
     let test = TestEnum2::One;
-    assert_eq!(test.get_heap_size(), 0);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 0);
 
     let test = TestEnum2::Two;
-    assert_eq!(test.get_heap_size(), 0);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 0);
 }
 
 #[derive(GetSize)]
@@ -241,5 +246,61 @@ pub struct TestNewType(u64);
 #[test]
 fn derive_newtype() {
     let test = TestNewType(0);
-    assert_eq!(u64::get_stack_size(), test.get_size());
+    assert_eq!(u64::get_stack_size(), test.get_size(&mut GetSizeNoTracker));
+}
+
+#[test]
+fn multiple_rc_without_tracker() {
+    let mut tracker = GetSizeNoTracker;
+
+    let test1 = Rc::new(0u64);
+    assert_eq!(test1.get_heap_size(&mut tracker), 8);
+
+    let test2 = test1.clone();
+    assert_eq!(test2.get_heap_size(&mut tracker), 8);
+
+    let test3 = Rc::downgrade(&test1);
+    assert_eq!(test3.get_heap_size(&mut tracker), 8);
+}
+
+#[test]
+fn multiple_rc_with_tracker() {
+    let mut tracker = BTreeSet::new();
+
+    let test1 = Rc::new(0u64);
+    assert_eq!(test1.get_heap_size(&mut tracker), 8);
+
+    let test2 = test1.clone();
+    assert_eq!(test2.get_heap_size(&mut tracker), 0);
+
+    let test3 = Rc::downgrade(&test1);
+    assert_eq!(test3.get_heap_size(&mut tracker), 0);
+}
+
+#[test]
+fn multiple_arc_without_tracker() {
+    let mut tracker = GetSizeNoTracker;
+
+    let test1 = Arc::new(0u64);
+    assert_eq!(test1.get_heap_size(&mut tracker), 8);
+
+    let test2 = test1.clone();
+    assert_eq!(test2.get_heap_size(&mut tracker), 8);
+
+    let test3 = Arc::downgrade(&test1);
+    assert_eq!(test3.get_heap_size(&mut tracker), 8);
+}
+
+#[test]
+fn multiple_arc_with_tracker() {
+    let mut tracker = BTreeSet::new();
+
+    let test1 = Arc::new(0u64);
+    assert_eq!(test1.get_heap_size(&mut tracker), 8);
+
+    let test2 = test1.clone();
+    assert_eq!(test2.get_heap_size(&mut tracker), 0);
+
+    let test3 = Arc::downgrade(&test1);
+    assert_eq!(test3.get_heap_size(&mut tracker), 0);
 }

@@ -21,6 +21,33 @@ use std::time::{Duration, Instant, SystemTime};
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use get_size_derive::*;
 
+/// Represent a bucket that can track memory addresses that have
+/// already been visited by `GetSize`.
+pub trait GetSizeTracker {
+    /// When first called on a given address returns true, false otherwise.
+    fn track(&mut self, address: *const ()) -> bool;
+}
+
+impl GetSizeTracker for std::collections::BTreeSet<*const ()> {
+    fn track(&mut self, address: *const ()) -> bool {
+        self.insert(address)
+    }
+}
+
+impl GetSizeTracker for std::collections::HashSet<*const ()> {
+    fn track(&mut self, address: *const ()) -> bool {
+        self.insert(address)
+    }
+}
+
+pub struct GetSizeNoTracker;
+
+impl GetSizeTracker for GetSizeNoTracker {
+    fn track(&mut self, _address: *const ()) -> bool {
+        true
+    }
+}
+
 /// Determine the size in bytes an object occupies inside RAM.
 pub trait GetSize: Sized {
     /// Determines how may bytes this object occupies inside the stack.
@@ -34,7 +61,7 @@ pub trait GetSize: Sized {
     ///
     /// The default implementation returns 0, assuming the object is fully allocated on the stack.
     /// It must be adjusted as appropriate for objects which hold data inside the heap.
-    fn get_heap_size(&self) -> usize {
+    fn get_heap_size(&self, _tracker: &mut dyn GetSizeTracker) -> usize {
         0
     }
 
@@ -42,8 +69,8 @@ pub trait GetSize: Sized {
     ///
     /// The default implementation simply adds up the result of the other two methods and is not meant
     /// to be changed.
-    fn get_size(&self) -> usize {
-        Self::get_stack_size() + GetSize::get_heap_size(self)
+    fn get_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
+        Self::get_stack_size() + GetSize::get_heap_size(self, tracker)
     }
 }
 
@@ -105,26 +132,27 @@ where
     T: ToOwned,
     <T as ToOwned>::Owned: GetSize,
 {
-    fn get_heap_size(&self) -> usize {
+    fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
         match self {
             Self::Borrowed(_borrowed) => 0,
-            Self::Owned(owned) => GetSize::get_heap_size(owned),
+            Self::Owned(owned) => GetSize::get_heap_size(owned, tracker),
         }
     }
 }
 
+#[macro_export]
 macro_rules! impl_size_set {
     ($name:ident) => {
         impl<T> GetSize for $name<T>
         where
             T: GetSize,
         {
-            fn get_heap_size(&self) -> usize {
+            fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
                 let mut total = 0;
 
                 for v in self.iter() {
                     // We assume that value are hold inside the heap.
-                    total += GetSize::get_size(v);
+                    total += GetSize::get_size(v, tracker);
                 }
 
                 let additional: usize = self.capacity() - self.len();
@@ -142,12 +170,12 @@ macro_rules! impl_size_set_no_capacity {
         where
             T: GetSize,
         {
-            fn get_heap_size(&self) -> usize {
+            fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
                 let mut total = 0;
 
                 for v in self.iter() {
                     // We assume that value are hold inside the heap.
-                    total += GetSize::get_size(v);
+                    total += GetSize::get_size(v, tracker);
                 }
 
                 total
@@ -156,6 +184,7 @@ macro_rules! impl_size_set_no_capacity {
     };
 }
 
+#[macro_export]
 macro_rules! impl_size_map {
     ($name:ident) => {
         impl<K, V> GetSize for $name<K, V>
@@ -163,13 +192,13 @@ macro_rules! impl_size_map {
             K: GetSize,
             V: GetSize,
         {
-            fn get_heap_size(&self) -> usize {
+            fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
                 let mut total = 0;
 
                 for (k, v) in self.iter() {
                     // We assume that keys and value are hold inside the heap.
-                    total += GetSize::get_size(k);
-                    total += GetSize::get_size(v);
+                    total += GetSize::get_size(k, tracker);
+                    total += GetSize::get_size(v, tracker);
                 }
 
                 let additional: usize = self.capacity() - self.len();
@@ -189,13 +218,13 @@ macro_rules! impl_size_map_no_capacity {
             K: GetSize,
             V: GetSize,
         {
-            fn get_heap_size(&self) -> usize {
+            fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
                 let mut total = 0;
 
                 for (k, v) in self.iter() {
                     // We assume that keys and value are hold inside the heap.
-                    total += GetSize::get_size(k);
-                    total += GetSize::get_size(v);
+                    total += GetSize::get_size(k, tracker);
+                    total += GetSize::get_size(v, tracker);
                 }
 
                 total
@@ -222,12 +251,12 @@ macro_rules! impl_size_tuple {
                 $T: GetSize,
             )*
         {
-            fn get_heap_size(&self) -> usize {
+            fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
                 let mut total = 0;
 
                 let ($($t,)*) = self;
                 $(
-                    total += GetSize::get_heap_size($t);
+                    total += GetSize::get_heap_size($t, tracker);
                 )*
 
                 total
@@ -281,12 +310,12 @@ impl<T, const SIZE: usize> GetSize for [T; SIZE]
 where
     T: GetSize,
 {
-    fn get_heap_size(&self) -> usize {
+    fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
         let mut total = 0;
 
         for element in self.iter() {
             // The array stack size already accounts for the stack size of the elements of the array.
-            total += GetSize::get_heap_size(element);
+            total += GetSize::get_heap_size(element, tracker);
         }
 
         total
@@ -300,12 +329,18 @@ impl<T> GetSize for &mut T {}
 impl<T> GetSize for *const T {}
 impl<T> GetSize for *mut T {}
 
+impl GetSize for Box<str> {
+    fn get_heap_size(&self, _tracker: &mut dyn GetSizeTracker) -> usize {
+        self.len()
+    }
+}
+
 impl<T> GetSize for Box<T>
 where
     T: GetSize,
 {
-    fn get_heap_size(&self) -> usize {
-        GetSize::get_size(&**self)
+    fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
+        GetSize::get_size(&**self, tracker)
     }
 }
 
@@ -313,8 +348,37 @@ impl<T> GetSize for Rc<T>
 where
     T: GetSize,
 {
-    fn get_heap_size(&self) -> usize {
-        GetSize::get_size(&**self)
+    fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
+        if tracker.track(Rc::as_ptr(self) as *const ()) {
+            GetSize::get_size(&**self, tracker)
+        } else {
+            0
+        }
+    }
+}
+
+impl<T> GetSize for std::rc::Weak<T>
+where
+    T: GetSize + ?Sized,
+{
+    fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
+        if tracker.track(std::rc::Weak::as_ptr(self) as *const ()) {
+            std::rc::Weak::upgrade(self)
+                .map(|rc| GetSize::get_size(&*rc, tracker))
+                .unwrap_or(0)
+        } else {
+            0
+        }
+    }
+}
+
+impl GetSize for Arc<str> {
+    fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
+        if tracker.track(Arc::as_ptr(self) as *const ()) {
+            self.len()
+        } else {
+            0
+        }
     }
 }
 
@@ -322,8 +386,27 @@ impl<T> GetSize for Arc<T>
 where
     T: GetSize,
 {
-    fn get_heap_size(&self) -> usize {
-        GetSize::get_size(&**self)
+    fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
+        if tracker.track(Arc::as_ptr(self) as *const ()) {
+            GetSize::get_size(&**self, tracker)
+        } else {
+            0
+        }
+    }
+}
+
+impl<T> GetSize for std::sync::Weak<T>
+where
+    T: GetSize + ?Sized,
+{
+    fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
+        if tracker.track(std::sync::Weak::as_ptr(self) as *const ()) {
+            std::sync::Weak::upgrade(self)
+                .map(|arc| GetSize::get_size(&*arc, tracker))
+                .unwrap_or(0)
+        } else {
+            0
+        }
     }
 }
 
@@ -331,10 +414,10 @@ impl<T> GetSize for Option<T>
 where
     T: GetSize,
 {
-    fn get_heap_size(&self) -> usize {
+    fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
         match self {
             // The options stack size already accounts for the values stack size.
-            Some(t) => GetSize::get_heap_size(t),
+            Some(t) => GetSize::get_heap_size(t, tracker),
             None => 0,
         }
     }
@@ -345,11 +428,11 @@ where
     T: GetSize,
     E: GetSize,
 {
-    fn get_heap_size(&self) -> usize {
+    fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
         match self {
             // The results stack size already accounts for the values stack size.
-            Ok(t) => GetSize::get_heap_size(t),
-            Err(e) => GetSize::get_heap_size(e),
+            Ok(t) => GetSize::get_heap_size(t, tracker),
+            Err(e) => GetSize::get_heap_size(e, tracker),
         }
     }
 }
@@ -358,9 +441,9 @@ impl<T> GetSize for Mutex<T>
 where
     T: GetSize,
 {
-    fn get_heap_size(&self) -> usize {
+    fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
         // We assume that a Mutex does hold its data at the stack.
-        GetSize::get_heap_size(&*(self.lock().unwrap()))
+        GetSize::get_heap_size(&*(self.lock().unwrap()), tracker)
     }
 }
 
@@ -368,14 +451,14 @@ impl<T> GetSize for RwLock<T>
 where
     T: GetSize,
 {
-    fn get_heap_size(&self) -> usize {
+    fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
         // We assume that a RwLock does hold its data at the stack.
-        GetSize::get_heap_size(&*(self.read().unwrap()))
+        GetSize::get_heap_size(&*(self.read().unwrap()), tracker)
     }
 }
 
 impl GetSize for String {
-    fn get_heap_size(&self) -> usize {
+    fn get_heap_size(&self, _tracker: &mut dyn GetSizeTracker) -> usize {
         self.capacity()
     }
 }
@@ -383,25 +466,25 @@ impl GetSize for String {
 impl GetSize for &str {}
 
 impl GetSize for std::ffi::CString {
-    fn get_heap_size(&self) -> usize {
+    fn get_heap_size(&self, _tracker: &mut dyn GetSizeTracker) -> usize {
         self.as_bytes_with_nul().len()
     }
 }
 
 impl GetSize for &std::ffi::CStr {
-    fn get_heap_size(&self) -> usize {
+    fn get_heap_size(&self, _tracker: &mut dyn GetSizeTracker) -> usize {
         self.to_bytes_with_nul().len()
     }
 }
 
 impl GetSize for std::ffi::OsString {
-    fn get_heap_size(&self) -> usize {
+    fn get_heap_size(&self, _tracker: &mut dyn GetSizeTracker) -> usize {
         self.len()
     }
 }
 
 impl GetSize for &std::ffi::OsStr {
-    fn get_heap_size(&self) -> usize {
+    fn get_heap_size(&self, _tracker: &mut dyn GetSizeTracker) -> usize {
         self.len()
     }
 }
@@ -419,8 +502,8 @@ impl<T> GetSize for std::io::BufReader<T>
 where
     T: GetSize,
 {
-    fn get_heap_size(&self) -> usize {
-        let mut total = GetSize::get_heap_size(self.get_ref());
+    fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
+        let mut total = GetSize::get_heap_size(self.get_ref(), tracker);
 
         total += self.capacity();
 
@@ -432,8 +515,8 @@ impl<T> GetSize for std::io::BufWriter<T>
 where
     T: GetSize + std::io::Write,
 {
-    fn get_heap_size(&self) -> usize {
-        let mut total = GetSize::get_heap_size(self.get_ref());
+    fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
+        let mut total = GetSize::get_heap_size(self.get_ref(), tracker);
 
         total += self.capacity();
 
@@ -442,7 +525,7 @@ where
 }
 
 impl GetSize for std::path::PathBuf {
-    fn get_heap_size(&self) -> usize {
+    fn get_heap_size(&self, _tracker: &mut dyn GetSizeTracker) -> usize {
         self.capacity()
     }
 }
@@ -450,10 +533,10 @@ impl GetSize for std::path::PathBuf {
 impl GetSize for &std::path::Path {}
 
 impl<T> GetSize for Box<[T]> {
-    fn get_heap_size(&self) -> usize {
+    fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
         let mut total = 0;
         for item in self.iter() {
-            total += item.get_size()
+            total += item.get_size(tracker)
         }
 
         total

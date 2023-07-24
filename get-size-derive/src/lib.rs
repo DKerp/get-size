@@ -137,7 +137,7 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
                             let field_ident = syn::parse_str::<syn::Ident>(&field_ident).unwrap();
 
                             field_cmds.push(quote! {
-                                total += GetSize::get_heap_size(#field_ident);
+                                total += GetSize::get_heap_size(#field_ident, tracker);
                             })
                         }
 
@@ -164,7 +164,7 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
                             field_idents.push(field_ident);
 
                             field_cmds.push(quote! {
-                                total += GetSize::get_heap_size(#field_ident);
+                                total += GetSize::get_heap_size(#field_ident, tracker);
                             })
                         }
 
@@ -189,7 +189,7 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
             // Build the trait implementation
             let gen = quote! {
                 impl #impl_generics GetSize for #name #ty_generics #where_clause {
-                    fn get_heap_size(&self) -> usize {
+                    fn get_heap_size(&self, tracker: &mut dyn get_size::GetSizeTracker) -> usize {
                         match self {
                             #(#cmds)*
                         }
@@ -239,12 +239,12 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
 
                 if let Some(ident) = field.ident.as_ref() {
                     cmds.push(quote! {
-                        total += GetSize::get_heap_size(&self.#ident);
+                        total += GetSize::get_heap_size(&self.#ident, tracker);
                     });
                 } else {
                     let current_index = syn::Index::from(unidentified_fields_count);
                     cmds.push(quote! {
-                        total += GetSize::get_heap_size(&self.#current_index);
+                        total += GetSize::get_heap_size(&self.#current_index, tracker);
                     });
 
                     unidentified_fields_count += 1;
@@ -254,7 +254,7 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
             // Build the trait implementation
             let gen = quote! {
                 impl #impl_generics GetSize for #name #ty_generics #where_clause {
-                    fn get_heap_size(&self) -> usize {
+                    fn get_heap_size(&self, tracker: &mut dyn get_size::GetSizeTracker) -> usize {
                         let mut total = 0;
 
                         #(#cmds)*;
