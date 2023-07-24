@@ -1,63 +1,25 @@
 #![doc = include_str!("./lib.md")]
-
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-
-
-use std::sync::{Arc, Mutex, RwLock};
-use std::sync::atomic::{
-    AtomicBool,
-    AtomicI8,
-    AtomicI16,
-    AtomicI32,
-    AtomicI64,
-    AtomicIsize,
-    AtomicU8,
-    AtomicU16,
-    AtomicU32,
-    AtomicU64,
-    AtomicUsize,
-    Ordering,
-};
-use std::collections::{
-    BTreeMap,
-    BTreeSet,
-    BinaryHeap,
-    HashMap,
-    HashSet,
-    LinkedList,
-    VecDeque,
-};
-use std::num::{
-    NonZeroI8,
-    NonZeroI16,
-    NonZeroI32,
-    NonZeroI64,
-    NonZeroI128,
-    NonZeroIsize,
-    NonZeroU8,
-    NonZeroU16,
-    NonZeroU32,
-    NonZeroU64,
-    NonZeroU128,
-    NonZeroUsize,
-};
-use std::convert::Infallible;
 use std::borrow::Cow;
-use std::rc::Rc;
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap, HashMap, HashSet, LinkedList, VecDeque};
+use std::convert::Infallible;
 use std::marker::{PhantomData, PhantomPinned};
-use std::time::{Instant, Duration, SystemTime};
-
-
+use std::num::{
+    NonZeroI128, NonZeroI16, NonZeroI32, NonZeroI64, NonZeroI8, NonZeroIsize, NonZeroU128,
+    NonZeroU16, NonZeroU32, NonZeroU64, NonZeroU8, NonZeroUsize,
+};
+use std::rc::Rc;
+use std::sync::atomic::{
+    AtomicBool, AtomicI16, AtomicI32, AtomicI64, AtomicI8, AtomicIsize, AtomicU16, AtomicU32,
+    AtomicU64, AtomicU8, AtomicUsize, Ordering,
+};
+use std::sync::{Arc, Mutex, RwLock};
+use std::time::{Duration, Instant, SystemTime};
 
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use get_size_derive::*;
-
-
-
-
-
 
 /// Determine the size in bytes an object occupies inside RAM.
 pub trait GetSize: Sized {
@@ -84,8 +46,6 @@ pub trait GetSize: Sized {
         Self::get_stack_size() + GetSize::get_heap_size(self)
     }
 }
-
-
 
 impl GetSize for () {}
 impl GetSize for bool {}
@@ -140,8 +100,6 @@ impl GetSize for Instant {}
 impl GetSize for Duration {}
 impl GetSize for SystemTime {}
 
-
-
 impl<'a, T> GetSize for Cow<'a, T>
 where
     T: ToOwned,
@@ -155,11 +113,12 @@ where
     }
 }
 
-
-
 macro_rules! impl_size_set {
     ($name:ident) => {
-        impl<T> GetSize for $name<T> where T: GetSize {
+        impl<T> GetSize for $name<T>
+        where
+            T: GetSize,
+        {
             fn get_heap_size(&self) -> usize {
                 let mut total = 0;
 
@@ -174,12 +133,15 @@ macro_rules! impl_size_set {
                 total
             }
         }
-    }
+    };
 }
 
 macro_rules! impl_size_set_no_capacity {
     ($name:ident) => {
-        impl<T> GetSize for $name<T> where T: GetSize {
+        impl<T> GetSize for $name<T>
+        where
+            T: GetSize,
+        {
             fn get_heap_size(&self) -> usize {
                 let mut total = 0;
 
@@ -191,12 +153,16 @@ macro_rules! impl_size_set_no_capacity {
                 total
             }
         }
-    }
+    };
 }
 
 macro_rules! impl_size_map {
     ($name:ident) => {
-        impl<K, V> GetSize for $name<K, V> where K: GetSize, V: GetSize {
+        impl<K, V> GetSize for $name<K, V>
+        where
+            K: GetSize,
+            V: GetSize,
+        {
             fn get_heap_size(&self) -> usize {
                 let mut total = 0;
 
@@ -213,12 +179,16 @@ macro_rules! impl_size_map {
                 total
             }
         }
-    }
+    };
 }
 
 macro_rules! impl_size_map_no_capacity {
     ($name:ident) => {
-        impl<K, V> GetSize for $name<K, V> where K: GetSize, V: GetSize {
+        impl<K, V> GetSize for $name<K, V>
+        where
+            K: GetSize,
+            V: GetSize,
+        {
             fn get_heap_size(&self) -> usize {
                 let mut total = 0;
 
@@ -231,7 +201,7 @@ macro_rules! impl_size_map_no_capacity {
                 total
             }
         }
-    }
+    };
 }
 
 impl_size_map_no_capacity!(BTreeMap);
@@ -243,8 +213,6 @@ impl_size_set_no_capacity!(LinkedList);
 impl_size_set!(VecDeque);
 
 impl_size_set!(Vec);
-
-
 
 macro_rules! impl_size_tuple {
     ($($t:ident, $T:ident),+) => {
@@ -270,30 +238,49 @@ macro_rules! impl_size_tuple {
 
 macro_rules! execute_tuple_macro_16 {
     ($name:ident) => {
-        $name!(v1,V1);
-        $name!(v1,V1,v2,V2);
-        $name!(v1,V1,v2,V2,v3,V3);
-        $name!(v1,V1,v2,V2,v3,V3,v4,V4);
-        $name!(v1,V1,v2,V2,v3,V3,v4,V4,v5,V5);
-        $name!(v1,V1,v2,V2,v3,V3,v4,V4,v5,V5,v6,V6);
-        $name!(v1,V1,v2,V2,v3,V3,v4,V4,v5,V5,v6,V6,v7,V7);
-        $name!(v1,V1,v2,V2,v3,V3,v4,V4,v5,V5,v6,V6,v7,V7,v8,V8);
-        $name!(v1,V1,v2,V2,v3,V3,v4,V4,v5,V5,v6,V6,v7,V7,v8,V8,v9,V9);
-        $name!(v1,V1,v2,V2,v3,V3,v4,V4,v5,V5,v6,V6,v7,V7,v8,V8,v9,V9,v10,V10);
-        $name!(v1,V1,v2,V2,v3,V3,v4,V4,v5,V5,v6,V6,v7,V7,v8,V8,v9,V9,v10,V10,v11,V11);
-        $name!(v1,V1,v2,V2,v3,V3,v4,V4,v5,V5,v6,V6,v7,V7,v8,V8,v9,V9,v10,V10,v11,V11,v12,V12);
-        $name!(v1,V1,v2,V2,v3,V3,v4,V4,v5,V5,v6,V6,v7,V7,v8,V8,v9,V9,v10,V10,v11,V11,v12,V12,v13,V13);
-        $name!(v1,V1,v2,V2,v3,V3,v4,V4,v5,V5,v6,V6,v7,V7,v8,V8,v9,V9,v10,V10,v11,V11,v12,V12,v13,V13,v14,V14);
-        $name!(v1,V1,v2,V2,v3,V3,v4,V4,v5,V5,v6,V6,v7,V7,v8,V8,v9,V9,v10,V10,v11,V11,v12,V12,v13,V13,v14,V14,v15,V15);
-        $name!(v1,V1,v2,V2,v3,V3,v4,V4,v5,V5,v6,V6,v7,V7,v8,V8,v9,V9,v10,V10,v11,V11,v12,V12,v13,V13,v14,V14,v15,V15,v16,V16);
-    }
+        $name!(v1, V1);
+        $name!(v1, V1, v2, V2);
+        $name!(v1, V1, v2, V2, v3, V3);
+        $name!(v1, V1, v2, V2, v3, V3, v4, V4);
+        $name!(v1, V1, v2, V2, v3, V3, v4, V4, v5, V5);
+        $name!(v1, V1, v2, V2, v3, V3, v4, V4, v5, V5, v6, V6);
+        $name!(v1, V1, v2, V2, v3, V3, v4, V4, v5, V5, v6, V6, v7, V7);
+        $name!(v1, V1, v2, V2, v3, V3, v4, V4, v5, V5, v6, V6, v7, V7, v8, V8);
+        $name!(v1, V1, v2, V2, v3, V3, v4, V4, v5, V5, v6, V6, v7, V7, v8, V8, v9, V9);
+        $name!(v1, V1, v2, V2, v3, V3, v4, V4, v5, V5, v6, V6, v7, V7, v8, V8, v9, V9, v10, V10);
+        $name!(
+            v1, V1, v2, V2, v3, V3, v4, V4, v5, V5, v6, V6, v7, V7, v8, V8, v9, V9, v10, V10, v11,
+            V11
+        );
+        $name!(
+            v1, V1, v2, V2, v3, V3, v4, V4, v5, V5, v6, V6, v7, V7, v8, V8, v9, V9, v10, V10, v11,
+            V11, v12, V12
+        );
+        $name!(
+            v1, V1, v2, V2, v3, V3, v4, V4, v5, V5, v6, V6, v7, V7, v8, V8, v9, V9, v10, V10, v11,
+            V11, v12, V12, v13, V13
+        );
+        $name!(
+            v1, V1, v2, V2, v3, V3, v4, V4, v5, V5, v6, V6, v7, V7, v8, V8, v9, V9, v10, V10, v11,
+            V11, v12, V12, v13, V13, v14, V14
+        );
+        $name!(
+            v1, V1, v2, V2, v3, V3, v4, V4, v5, V5, v6, V6, v7, V7, v8, V8, v9, V9, v10, V10, v11,
+            V11, v12, V12, v13, V13, v14, V14, v15, V15
+        );
+        $name!(
+            v1, V1, v2, V2, v3, V3, v4, V4, v5, V5, v6, V6, v7, V7, v8, V8, v9, V9, v10, V10, v11,
+            V11, v12, V12, v13, V13, v14, V14, v15, V15, v16, V16
+        );
+    };
 }
 
 execute_tuple_macro_16!(impl_size_tuple);
 
-
-
-impl<T, const SIZE: usize> GetSize for [T; SIZE] where T: GetSize {
+impl<T, const SIZE: usize> GetSize for [T; SIZE]
+where
+    T: GetSize,
+{
     fn get_heap_size(&self) -> usize {
         let mut total = 0;
 
@@ -313,35 +300,51 @@ impl<T> GetSize for &mut T {}
 impl<T> GetSize for *const T {}
 impl<T> GetSize for *mut T {}
 
-impl<T> GetSize for Box<T> where T: GetSize {
+impl<T> GetSize for Box<T>
+where
+    T: GetSize,
+{
     fn get_heap_size(&self) -> usize {
         GetSize::get_size(&**self)
     }
 }
 
-impl<T> GetSize for Rc<T> where T: GetSize {
+impl<T> GetSize for Rc<T>
+where
+    T: GetSize,
+{
     fn get_heap_size(&self) -> usize {
         GetSize::get_size(&**self)
     }
 }
 
-impl<T> GetSize for Arc<T> where T: GetSize {
+impl<T> GetSize for Arc<T>
+where
+    T: GetSize,
+{
     fn get_heap_size(&self) -> usize {
         GetSize::get_size(&**self)
     }
 }
 
-impl<T> GetSize for Option<T> where T: GetSize {
+impl<T> GetSize for Option<T>
+where
+    T: GetSize,
+{
     fn get_heap_size(&self) -> usize {
         match self {
             // The options stack size already accounts for the values stack size.
             Some(t) => GetSize::get_heap_size(t),
-            None => 0
+            None => 0,
         }
     }
 }
 
-impl<T, E> GetSize for Result<T, E> where T: GetSize, E: GetSize {
+impl<T, E> GetSize for Result<T, E>
+where
+    T: GetSize,
+    E: GetSize,
+{
     fn get_heap_size(&self) -> usize {
         match self {
             // The results stack size already accounts for the values stack size.
@@ -351,20 +354,25 @@ impl<T, E> GetSize for Result<T, E> where T: GetSize, E: GetSize {
     }
 }
 
-impl<T> GetSize for Mutex<T> where T: GetSize {
+impl<T> GetSize for Mutex<T>
+where
+    T: GetSize,
+{
     fn get_heap_size(&self) -> usize {
         // We assume that a Mutex does hold its data at the stack.
         GetSize::get_heap_size(&*(self.lock().unwrap()))
     }
 }
 
-impl<T> GetSize for RwLock<T> where T: GetSize {
+impl<T> GetSize for RwLock<T>
+where
+    T: GetSize,
+{
     fn get_heap_size(&self) -> usize {
         // We assume that a RwLock does hold its data at the stack.
         GetSize::get_heap_size(&*(self.read().unwrap()))
     }
 }
-
 
 impl GetSize for String {
     fn get_heap_size(&self) -> usize {
@@ -407,7 +415,10 @@ impl GetSize for std::fs::OpenOptions {}
 impl GetSize for std::fs::Permissions {}
 impl GetSize for std::fs::ReadDir {}
 
-impl<T> GetSize for std::io::BufReader<T> where T: GetSize {
+impl<T> GetSize for std::io::BufReader<T>
+where
+    T: GetSize,
+{
     fn get_heap_size(&self) -> usize {
         let mut total = GetSize::get_heap_size(self.get_ref());
 
@@ -417,7 +428,10 @@ impl<T> GetSize for std::io::BufReader<T> where T: GetSize {
     }
 }
 
-impl<T> GetSize for std::io::BufWriter<T> where T: GetSize + std::io::Write {
+impl<T> GetSize for std::io::BufWriter<T>
+where
+    T: GetSize + std::io::Write,
+{
     fn get_heap_size(&self) -> usize {
         let mut total = GetSize::get_heap_size(self.get_ref());
 

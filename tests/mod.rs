@@ -16,7 +16,6 @@ fn derive_struct() {
     assert_eq!(test.get_heap_size(), 5);
 }
 
-
 #[derive(GetSize)]
 pub struct TestStructGenerics<A, B> {
     value1: A,
@@ -32,7 +31,6 @@ fn derive_struct_with_generics() {
 
     assert_eq!(test.get_heap_size(), 5);
 }
-
 
 #[derive(GetSize)]
 #[get_size(ignore(B, C))]
@@ -56,15 +54,15 @@ fn derive_struct_with_generics_and_ignore() {
         value: "World!".into(),
     };
 
-    let test: TestStructGenericsIgnore<String, u64, TestStructNoGetSize> = TestStructGenericsIgnore {
-        value1: "Hello".into(),
-        value2: 123,
-        value3: no_impl,
-    };
+    let test: TestStructGenericsIgnore<String, u64, TestStructNoGetSize> =
+        TestStructGenericsIgnore {
+            value1: "Hello".into(),
+            value2: 123,
+            value3: no_impl,
+        };
 
     assert_eq!(test.get_heap_size(), 5);
 }
-
 
 #[derive(GetSize)]
 #[get_size(ignore(B, C))]
@@ -96,7 +94,6 @@ fn derive_struct_with_generics_and_helpers() {
     assert_eq!(test.get_heap_size(), 5 + 100 + 50);
 }
 
-
 #[derive(GetSize)]
 pub struct TestStructGenericsLifetimes<'a, A, B> {
     value1: A,
@@ -115,7 +112,6 @@ fn derive_struct_with_generics_and_lifetimes() {
     assert_eq!(test.get_heap_size(), 5);
 }
 
-
 #[derive(GetSize)]
 pub enum TestEnum {
     Variant1(u8, u16, u32),
@@ -124,7 +120,7 @@ pub enum TestEnum {
     Variant4(String, i32, Vec<u32>, bool, &'static str),
     Variant5(f64, TestStruct),
     Variant6,
-    Variant7{x: String, y: String},
+    Variant7 { x: String, y: String },
 }
 
 #[test]
@@ -156,10 +152,12 @@ fn derive_enum() {
     let test = TestEnum::Variant6;
     assert_eq!(test.get_heap_size(), 0);
 
-    let test = TestEnum::Variant7{x: "Hello".into(), y: "world".into()};
+    let test = TestEnum::Variant7 {
+        x: "Hello".into(),
+        y: "world".into(),
+    };
     assert_eq!(test.get_heap_size(), 5 + 5);
 }
-
 
 #[derive(GetSize)]
 pub enum TestEnumGenerics<'a, A, B, C> {
@@ -173,7 +171,8 @@ fn derive_enum_generics() {
     let test: TestEnumGenerics<u64, String, TestStruct> = TestEnumGenerics::Variant1(123);
     assert_eq!(test.get_heap_size(), 0);
 
-    let test: TestEnumGenerics<u64, String, TestStruct> = TestEnumGenerics::Variant2("Hello".into());
+    let test: TestEnumGenerics<u64, String, TestStruct> =
+        TestEnumGenerics::Variant2("Hello".into());
     assert_eq!(test.get_heap_size(), 5);
 
     let test_struct = TestStruct {
@@ -185,11 +184,13 @@ fn derive_enum_generics() {
     assert_eq!(test.get_heap_size(), 0); // It is a pointer.
 }
 
-
 const MINIMAL_NODE_SIZE: usize = 3;
 
 #[derive(Clone, GetSize)]
-enum Node<T> where T: Default {
+enum Node<T>
+where
+    T: Default,
+{
     Block(T),
     Blocks(Box<[T; MINIMAL_NODE_SIZE * MINIMAL_NODE_SIZE * MINIMAL_NODE_SIZE]>),
     Nodes(Box<[Node<T>; 8]>),
@@ -201,7 +202,7 @@ fn derive_enum_generics_issue1() {
     assert_eq!(test.get_heap_size(), 4);
 
     let test: Node<u64> = Node::Blocks(Box::new([123; 27]));
-    assert_eq!(test.get_heap_size(), 8*27);
+    assert_eq!(test.get_heap_size(), 8 * 27);
 
     let t1: Node<u64> = Node::Block(123);
     let t2 = t1.clone();
@@ -211,10 +212,9 @@ fn derive_enum_generics_issue1() {
     let t6 = t1.clone();
     let t7 = t1.clone();
     let t8 = t1.clone();
-    let test: Node<u64> = Node::Nodes(Box::new([t1,t2,t3,t4,t5,t6,t7,t8]));
-    assert_eq!(test.get_heap_size(), 8*std::mem::size_of::<Node<u64>>());
+    let test: Node<u64> = Node::Nodes(Box::new([t1, t2, t3, t4, t5, t6, t7, t8]));
+    assert_eq!(test.get_heap_size(), 8 * std::mem::size_of::<Node<u64>>());
 }
-
 
 #[derive(GetSize)]
 pub enum TestEnum2 {
@@ -234,7 +234,6 @@ fn derive_enum_c_style() {
     let test = TestEnum2::Two;
     assert_eq!(test.get_heap_size(), 0);
 }
-
 
 #[derive(GetSize)]
 pub struct TestNewType(u64);
