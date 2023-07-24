@@ -57,9 +57,6 @@ pub use get_size_derive::*;
 
 
 
-#[cfg(test)]
-mod tests;
-
 
 
 /// Determine the size in bytes an object occupies inside RAM.
