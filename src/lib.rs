@@ -21,6 +21,8 @@ use std::time::{Duration, Instant, SystemTime};
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use get_size_derive::*;
 
+mod remote;
+
 /// Represent a bucket that can track memory addresses that have
 /// already been visited by `GetSize`.
 pub trait GetSizeTracker {
