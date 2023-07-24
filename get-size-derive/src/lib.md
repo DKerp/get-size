@@ -9,7 +9,7 @@ Note that the derive macro _does not support unions_. You have to manually imple
 Deriving [`GetSize`] for a struct:
 
 ```rust
-use get_size::GetSize;
+use get_size::{GetSize, GetSizeNoTracker};
 
 #[derive(GetSize)]
 pub struct OwnStruct {
@@ -23,14 +23,14 @@ fn main() {
         value2: 123,
     };
 
-    assert_eq!(test.get_heap_size(), 5);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 5);
 }
 ```
 
 Deriving [`GetSize`] for an enum:
 
 ```rust
-use get_size::GetSize;
+use get_size::{GetSize, GetSizeNoTracker};
 
 #[derive(GetSize)]
 pub enum TestEnum {
@@ -49,26 +49,26 @@ pub enum TestEnumNumber {
 
 fn main() {
     let test = TestEnum::Variant1(1, 2, 3);
-    assert_eq!(test.get_heap_size(), 0);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 0);
 
     let test = TestEnum::Variant2("Hello".into());
-    assert_eq!(test.get_heap_size(), 5);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 5);
 
     let test = TestEnum::Variant3;
-    assert_eq!(test.get_heap_size(), 0);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 0);
 
     let test = TestEnum::Variant4{x: "Hello".into(), y: "world".into()};
-    assert_eq!(test.get_heap_size(), 5 + 5);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 5 + 5);
 
     let test = TestEnumNumber::One;
-    assert_eq!(test.get_heap_size(), 0);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 0);
 }
 ```
 
 The derive macro does also work with generics. The generated trait implementation will by default require all generic types to implement [`GetSize`] themselves, but this [can be changed](#ignoring-certain-generic-types).
 
 ```rust
-use get_size::GetSize;
+use get_size::{GetSize, GetSizeNoTracker};
 
 #[derive(GetSize)]
 struct TestStructGenerics<A, B> {
@@ -88,16 +88,16 @@ fn main() {
         value2: 123,
     };
 
-    assert_eq!(test.get_heap_size(), 5);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 5);
 
     let test = String::from("Hello");
     let test: TestEnumGenerics<String, u64> = TestEnumGenerics::Variant1(test);
 
-    assert_eq!(test.get_heap_size(), 5);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 5);
 
     let test: TestEnumGenerics<String, u64> = TestEnumGenerics::Variant2(100);
 
-    assert_eq!(test.get_heap_size(), 0);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 0);
 }
 ```
 
@@ -117,7 +117,7 @@ The idiomatic use case for this helper is if you use shared ownership and do not
 
 ```rust
 use std::sync::Arc;
-use get_size::GetSize;
+use get_size::{GetSize, GetSizeNoTracker};
 
 #[derive(GetSize)]
 struct PrimaryStore {
@@ -146,8 +146,8 @@ fn main() {
   };
 
   // Note that Arc does also store the Vec's stack data on the heap.
-  assert_eq!(primary_data.get_heap_size(), Vec::<u8>::get_stack_size() + 1024);
-  assert_eq!(secondary_data.get_heap_size(), 0);
+  assert_eq!(primary_data.get_heap_size(&mut GetSizeNoTracker), Vec::<u8>::get_stack_size() + 1024);
+  assert_eq!(secondary_data.get_heap_size(&mut GetSizeNoTracker), 0);
 }
 ```
 
@@ -158,7 +158,7 @@ But you may also use this as a band aid, if a certain struct fields type does no
 Be aware though that this will result in an implementation which will return incorrect results, unless the heap size of that type is indeed always zero and can thus be ignored. It is therefor advisable to use one of the next two helper options instead.
 
 ```rust
-use get_size::GetSize;
+use get_size::{GetSize, GetSizeNoTracker};
 
 // Does not implement GetSize!
 struct TestStructNoGetSize {
@@ -184,7 +184,7 @@ fn main() {
   };
 
   // Note that the result is lower then it should be.
-  assert_eq!(test.get_heap_size(), 4);
+  assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 4);
 }
 ```
 
@@ -193,7 +193,7 @@ fn main() {
 In same cases you may be dealing with external types which allocate a fixed amount of bytes at the heap. In this case you may use the `size` attribute to always account the given field with a fixed value.
 
 ```rust
-use get_size::GetSize;
+use get_size::{GetSize, GetSizeNoTracker};
 #
 # struct Buffer1024 {}
 #
@@ -216,7 +216,7 @@ fn main() {
     buffer: Buffer1024::new(),
   };
 
-  assert_eq!(test.get_heap_size(), 1024);
+  assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 1024);
 }
 ```
 
@@ -229,7 +229,7 @@ The latter is especially usefull if you can make use of a certain trait to calcu
 Note that unlike in other crates, the name of the function to be called is __not__ encapsulated by double-quotes ("), but rather given directly.
 
 ```rust
-use get_size::GetSize;
+use get_size::{GetSize, GetSizeNoTracker};
 #
 # type ExternalVecAlike<T> = Vec<T>;
 
@@ -257,7 +257,7 @@ fn main() {
     buffer,
   };
 
-  assert_eq!(test.get_heap_size(), 512);
+  assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 512);
 }
 ```
 
@@ -266,7 +266,7 @@ fn main() {
 If your struct uses generics, but the fields at which they are stored are ignored or get handled by helpers because the generic does not implement [`GetSize`], you will have to mark these generics with a special struct level `ignore` attribute. Otherwise the derived [`GetSize`] implementation would still require these generics to implement [`GetSize`], even through there is no need for it.
 
 ```rust
-use get_size::GetSize;
+use get_size::{GetSize, GetSizeNoTracker};
 
 #[derive(GetSize)]
 #[get_size(ignore(B, C, D))]
@@ -295,7 +295,7 @@ fn main() {
         value4: 123,
     };
 
-    assert_eq!(test.get_heap_size(), 5 + 100 + 50);
+    assert_eq!(test.get_heap_size(&mut GetSizeNoTracker), 5 + 100 + 50);
 }
 ```
 
