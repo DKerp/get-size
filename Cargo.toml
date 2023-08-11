@@ -11,7 +11,11 @@ keywords = ["size", "heap", "ram", "cache", "memory"]
 categories = ["memory-management", "caching"]
 
 [dependencies]
-get-size-derive = { version = "^0.1.3", optional = true }
+# get-size-derive = { version = "^0.1.3", optional = true }
+get-size-derive = { path = "get-size-derive", optional = true }
+
+[dev-dependencies]
+get-size = { path = ".", features = ["derive"] }
 
 [features]
 default = []
