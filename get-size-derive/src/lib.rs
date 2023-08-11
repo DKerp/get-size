@@ -146,7 +146,8 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
                             let field_ident = syn::parse_str::<syn::Ident>(&field_ident).unwrap();
 
                             field_cmds.push(quote! {
-                                total += GetSize::get_heap_size(#field_ident);
+                                let (total_add, tracker) = GetSize::get_heap_size_with_tracker(#field_ident, tracker);
+                                total += total_add;
                             })
                         }
 
@@ -156,7 +157,7 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
 
                                 #(#field_cmds)*;
 
-                                total
+                                (total, tracker)
                             }
                         });
                     }
@@ -173,7 +174,8 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
                             field_idents.push(field_ident);
 
                             field_cmds.push(quote! {
-                                total += GetSize::get_heap_size(#field_ident);
+                                let (total_add, tracker) = GetSize::get_heap_size_with_tracker(#field_ident, tracker);
+                                total += total_add;
                             })
                         }
 
@@ -183,13 +185,13 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
 
                                 #(#field_cmds)*;
 
-                                total
+                                (total, tracker)
                             }
                         });
                     }
                     syn::Fields::Unit => {
                         cmds.push(quote! {
-                            Self::#ident => 0,
+                            Self::#ident => (0, tracker),
                         });
                     }
                 }
@@ -199,6 +201,17 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
             let gen = quote! {
                 impl #impl_generics GetSize for #name #ty_generics #where_clause {
                     fn get_heap_size(&self) -> usize {
+                        let tracker = get_size::StandardTracker::default();
+
+                        let (total, _) = GetSize::get_heap_size_with_tracker(self, tracker);
+
+                        total
+                    }
+
+                    fn get_heap_size_with_tracker<TRACKER: get_size::GetSizeTracker>(
+                        &self,
+                        tracker: TRACKER,
+                    ) -> (usize, TRACKER) {
                         match self {
                             #(#cmds)*
                         }
@@ -247,12 +260,14 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
 
                 if let Some(ident) = field.ident.as_ref() {
                     cmds.push(quote! {
-                        total += GetSize::get_heap_size(&self.#ident);
+                        let (total_add, tracker) = GetSize::get_heap_size_with_tracker(&self.#ident, tracker);
+                        total += total_add;
                     });
                 } else {
                     let current_index = syn::Index::from(unidentified_fields_count);
                     cmds.push(quote! {
-                        total += GetSize::get_heap_size(&self.#current_index);
+                        let (total_add, tracker) = GetSize::get_heap_size_with_tracker(&self.#current_index, tracker);
+                        total += total_add;
                     });
 
                     unidentified_fields_count += 1;
@@ -263,11 +278,22 @@ pub fn derive_get_size(input: TokenStream) -> TokenStream {
             let gen = quote! {
                 impl #impl_generics GetSize for #name #ty_generics #where_clause {
                     fn get_heap_size(&self) -> usize {
+                        let tracker = get_size::StandardTracker::default();
+
+                        let (total, _) = GetSize::get_heap_size_with_tracker(self, tracker);
+
+                        total
+                    }
+
+                    fn get_heap_size_with_tracker<TRACKER: get_size::GetSizeTracker>(
+                        &self,
+                        tracker: TRACKER,
+                    ) -> (usize, TRACKER) {
                         let mut total = 0;
 
                         #(#cmds)*;
 
-                        total
+                        (total, tracker)
                     }
                 }
             };

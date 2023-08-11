@@ -1,4 +1,6 @@
-use super::*;
+use get_size::*;
+
+
 
 #[derive(GetSize)]
 pub struct TestStruct {
