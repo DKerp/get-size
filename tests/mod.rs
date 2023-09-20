@@ -246,3 +246,16 @@ fn derive_newtype() {
     let test = TestNewType(0);
     assert_eq!(u64::get_stack_size(), test.get_size());
 }
+
+#[test]
+fn boxed_slice() {
+    use std::mem::size_of;
+    let boxed = vec![1u8; 10].into_boxed_slice();
+    assert_eq!(boxed.get_heap_size(), size_of::<u8>() * boxed.len());
+
+    let boxed = vec![1u32; 10].into_boxed_slice();
+    assert_eq!(boxed.get_heap_size(), size_of::<u32>() * boxed.len());
+
+    let boxed = vec![&1u8; 10].into_boxed_slice();
+    assert_eq!(boxed.get_heap_size(), size_of::<&u8>() * boxed.len());
+}
