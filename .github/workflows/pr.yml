@@ -1,0 +1,50 @@
+name: PR
+
+on:
+  pull_request:
+
+jobs:
+  test-server:
+    runs-on: [self-hosted, aws, x64]
+    env:
+      CARGO_TERM_COLOR: always
+    if: ${{ !github.event.pull_request.draft }}
+
+    steps:
+      - uses: colpal/actions-clean@v1
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: "1" # increment this to bust the cache if needed
+
+      - name: Run cargo test
+        run: cargo test
+
+  lint:
+    runs-on: [self-hosted, linux-x64-small]
+    env:
+      CARGO_TERM_COLOR: always
+    if: ${{ !github.event.pull_request.draft }}
+
+    steps:
+      - uses: colpal/actions-clean@v1
+      - uses: actions/checkout@v4
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: "1" # increment this to bust the cache if needed
+
+      - name: Run cargo lint
+        run: cargo lint
