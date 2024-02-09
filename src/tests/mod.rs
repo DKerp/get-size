@@ -244,3 +244,10 @@ fn derive_newtype() {
     let test = TestNewType(0);
     assert_eq!(u64::get_stack_size(), test.get_size());
 }
+
+#[test]
+fn test_arc_str_size(){
+    let str_text = "a";
+    let arc: Arc<str> = Arc::from(str_text);
+    assert_eq!(arc.get_size(), std::mem::size_of::<usize>() + std::mem::size_of_val(str_text));
+}

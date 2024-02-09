@@ -53,8 +53,7 @@ use std::time::{Instant, Duration, SystemTime};
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use get_size_derive::*;
-
-
+use tokio::io::AsyncRead;
 
 
 #[cfg(test)]
@@ -140,9 +139,12 @@ impl<T> GetSize for PhantomData<T> {}
 impl GetSize for PhantomPinned {}
 
 impl GetSize for Instant {}
-impl GetSize for Duration {}
 impl GetSize for SystemTime {}
-
+impl GetSize for Duration {
+    fn get_stack_size() -> usize {
+        12
+    }
+}
 
 
 impl<'a, T> GetSize for Cow<'a, T>
@@ -334,6 +336,12 @@ impl<T> GetSize for Arc<T> where T: GetSize {
     }
 }
 
+impl GetSize for Arc<str> {
+    fn get_size(&self) -> usize {
+        std::mem::size_of::<usize>() + (&**self).get_size()
+    }
+}
+
 impl<T> GetSize for Option<T> where T: GetSize {
     fn get_heap_size(&self) -> usize {
         match self {
@@ -375,7 +383,11 @@ impl GetSize for String {
     }
 }
 
-impl GetSize for &str {}
+impl GetSize for &str {
+    fn get_size(&self) -> usize {
+        std::mem::size_of_val(*self)
+    }
+}
 
 impl GetSize for std::ffi::CString {
     fn get_heap_size(&self) -> usize {
@@ -446,5 +458,41 @@ impl<T> GetSize for Box<[T]> {
         }
 
         total
+    }
+}
+
+#[cfg(feature = "tokio")]
+impl<T> GetSize for tokio::sync::mpsc::UnboundedSender<T> {}
+
+#[cfg(feature = "tokio")]
+impl<T> GetSize for tokio::sync::mpsc::WeakUnboundedSender<T> {}
+
+#[cfg(feature = "tokio")]
+impl GetSize for tokio::time::Instant {}
+
+#[cfg(feature = "tokio")]
+impl GetSize for tokio::time::Interval {
+    fn get_size(&self) -> usize {
+        std::mem::size_of_val(self)
+    }
+}
+
+#[cfg(feature = "tokio")]
+impl <T: AsyncRead> GetSize for tokio::io::BufReader<T> {
+    fn get_size(&self) -> usize {
+        let inner = std::mem::size_of_val(self.get_ref());
+        let buf = self.buffer().len();
+        let pos = 1_usize;
+        let cap = 1_usize;
+        let seek_state = 9_usize;
+
+        inner + buf + pos + cap + seek_state
+    }
+}
+
+#[cfg(feature = "serde_json")]
+impl GetSize for serde_json::Value {
+    fn get_size(&self) -> usize {
+        std::mem::size_of_val(self)
     }
 }
