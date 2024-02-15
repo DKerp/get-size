@@ -27,17 +27,17 @@ mod remote;
 /// already been visited by `GetSize`.
 pub trait GetSizeTracker {
     /// When first called on a given address returns true, false otherwise.
-    fn track(&mut self, address: *const ()) -> bool;
+    fn track(&mut self, address: usize) -> bool;
 }
 
-impl GetSizeTracker for std::collections::BTreeSet<*const ()> {
-    fn track(&mut self, address: *const ()) -> bool {
+impl GetSizeTracker for std::collections::BTreeSet<usize> {
+    fn track(&mut self, address: usize) -> bool {
         self.insert(address)
     }
 }
 
-impl GetSizeTracker for std::collections::HashSet<*const ()> {
-    fn track(&mut self, address: *const ()) -> bool {
+impl GetSizeTracker for std::collections::HashSet<usize> {
+    fn track(&mut self, address: usize) -> bool {
         self.insert(address)
     }
 }
@@ -45,7 +45,7 @@ impl GetSizeTracker for std::collections::HashSet<*const ()> {
 pub struct GetSizeNoTracker;
 
 impl GetSizeTracker for GetSizeNoTracker {
-    fn track(&mut self, _address: *const ()) -> bool {
+    fn track(&mut self, _address: usize) -> bool {
         true
     }
 }
@@ -351,7 +351,7 @@ where
     T: GetSize,
 {
     fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
-        if tracker.track(Rc::as_ptr(self) as *const ()) {
+        if tracker.track(Rc::as_ptr(self) as *const () as usize) {
             GetSize::get_size(&**self, tracker)
         } else {
             0
@@ -364,7 +364,7 @@ where
     T: GetSize + ?Sized,
 {
     fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
-        if tracker.track(std::rc::Weak::as_ptr(self) as *const ()) {
+        if tracker.track(std::rc::Weak::as_ptr(self) as *const () as usize) {
             std::rc::Weak::upgrade(self)
                 .map(|rc| GetSize::get_size(&*rc, tracker))
                 .unwrap_or(0)
@@ -376,7 +376,7 @@ where
 
 impl GetSize for Arc<str> {
     fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
-        if tracker.track(Arc::as_ptr(self) as *const ()) {
+        if tracker.track(Arc::as_ptr(self) as *const () as usize) {
             self.len()
         } else {
             0
@@ -389,7 +389,7 @@ where
     T: GetSize,
 {
     fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
-        if tracker.track(Arc::as_ptr(self) as *const ()) {
+        if tracker.track(Arc::as_ptr(self) as *const () as usize) {
             GetSize::get_size(&**self, tracker)
         } else {
             0
@@ -402,7 +402,7 @@ where
     T: GetSize + ?Sized,
 {
     fn get_heap_size(&self, tracker: &mut dyn GetSizeTracker) -> usize {
-        if tracker.track(std::sync::Weak::as_ptr(self) as *const ()) {
+        if tracker.track(std::sync::Weak::as_ptr(self) as *const () as usize) {
             std::sync::Weak::upgrade(self)
                 .map(|arc| GetSize::get_size(&*arc, tracker))
                 .unwrap_or(0)
