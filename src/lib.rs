@@ -53,7 +53,6 @@ use std::time::{Instant, Duration, SystemTime};
 #[cfg(feature = "derive")]
 #[cfg_attr(docsrs, doc(cfg(feature = "derive")))]
 pub use get_size_derive::*;
-use tokio::io::AsyncRead;
 
 
 #[cfg(test)]
@@ -342,6 +341,12 @@ impl GetSize for Arc<str> {
     }
 }
 
+impl GetSize for Box<str> {
+    fn get_size(&self) -> usize {
+        std::mem::size_of::<usize>() + (&**self).get_size()
+    }
+}
+
 impl<T> GetSize for Option<T> where T: GetSize {
     fn get_heap_size(&self) -> usize {
         match self {
@@ -478,7 +483,7 @@ impl GetSize for tokio::time::Interval {
 }
 
 #[cfg(feature = "tokio")]
-impl <T: AsyncRead> GetSize for tokio::io::BufReader<T> {
+impl <T: tokio::io::AsyncRead> GetSize for tokio::io::BufReader<T> {
     fn get_size(&self) -> usize {
         let inner = std::mem::size_of_val(self.get_ref());
         let buf = self.buffer().len();

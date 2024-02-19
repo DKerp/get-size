@@ -251,3 +251,10 @@ fn test_arc_str_size(){
     let arc: Arc<str> = Arc::from(str_text);
     assert_eq!(arc.get_size(), std::mem::size_of::<usize>() + std::mem::size_of_val(str_text));
 }
+
+#[test]
+fn test_boxed_str_size() {
+    let str_text = "a";
+    let boxed: Box<str> = Box::from(str_text);
+    assert_eq!(boxed.get_size(), std::mem::size_of::<usize>() + std::mem::size_of_val(str_text));
+}
